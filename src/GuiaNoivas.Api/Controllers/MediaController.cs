@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Configuration;
+using Microsoft.EntityFrameworkCore;
 
 namespace GuiaNoivas.Api.Controllers;
 
@@ -106,8 +107,9 @@ public class MediaController : ControllerBase
         try
         {
             // unset other primary flags for this fornecedor
-            var others = db.Media.Where(m => m.FornecedorId == fornecedorId && m.Id != id && m.IsPrimary);
-            await others.ForEachAsync(m => m.IsPrimary = false);
+            await db.Media
+                .Where(m => m.FornecedorId == fornecedorId && m.Id != id && m.IsPrimary)
+                .ExecuteUpdateAsync(s => s.SetProperty(m => m.IsPrimary, m => false));
 
             media.IsPrimary = true;
             db.Media.Update(media);
