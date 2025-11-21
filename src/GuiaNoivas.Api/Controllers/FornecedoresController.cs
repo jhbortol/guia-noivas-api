@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using GuiaNoivas.Api.Data;
 using GuiaNoivas.Api.Models;
@@ -7,6 +8,7 @@ namespace GuiaNoivas.Api.Controllers;
 
 [ApiController]
 [Route("api/v1/fornecedores")]
+[Authorize]
 public class FornecedoresController : ControllerBase
 {
     private readonly AppDbContext _db;

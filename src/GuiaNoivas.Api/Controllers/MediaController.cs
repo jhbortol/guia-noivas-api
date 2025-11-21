@@ -9,28 +9,39 @@ namespace GuiaNoivas.Api.Controllers;
 public class MediaController : ControllerBase
 {
     private readonly IConfiguration _config;
+    private readonly GuiaNoivas.Api.Services.IBlobService? _blobService;
 
-    public MediaController(IConfiguration config)
+    public MediaController(IConfiguration config, GuiaNoivas.Api.Services.IBlobService? blobService = null)
     {
         _config = config;
+        _blobService = blobService;
     }
 
     [HttpPost("presign")]
     [Authorize]
     public IActionResult Presign([FromBody] PresignDto dto)
     {
-        // Minimal implementation: return a fake presign when Azure is not configured
-        var storageConnection = _config["Azure:BlobConnectionString"]; // optional
-        if (string.IsNullOrEmpty(storageConnection))
+        // If Blob service is registered (Storage configured), generate SAS URL.
+        if (_blobService != null)
         {
-            // fallback: return a local upload URL (client should POST multipart to /uploads)
             var fileName = dto.Filename ?? Guid.NewGuid().ToString();
-            var publicUrl = $"/uploads/{fileName}";
-            return Ok(new { uploadUrl = publicUrl, publicUrl, blobName = fileName });
+            var safeName = fileName.Replace(" ", "_");
+            var blobName = $"{Guid.NewGuid():N}_{safeName}";
+            try
+            {
+                var result = _blobService.GetUploadSasUriAsync(blobName, TimeSpan.FromMinutes(15), dto.ContentType).GetAwaiter().GetResult();
+                return Ok(new { uploadUrl = result.Url.ToString(), blobName = result.BlobName });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { error = "Failed to generate SAS URL.", details = ex.Message });
+            }
         }
 
-        // If Azure configured, real implementation would generate SAS URL here.
-        return Ok(new { uploadUrl = "", publicUrl = "", blobName = "" });
+        // fallback: return a local upload URL (client should POST multipart to /uploads)
+        var fallbackFile = dto.Filename ?? Guid.NewGuid().ToString();
+        var publicUrl = $"/uploads/{fallbackFile}";
+        return Ok(new { uploadUrl = publicUrl, publicUrl, blobName = fallbackFile });
     }
 
     [HttpPost]

@@ -27,3 +27,21 @@ dotnet-install.ps1
 *.log
 
 # EF Core Migrations snapshot and generated files are tracked (do not ignore)
+
+# Additional ignores for repo cleanliness
+**/bin/
+**/obj/
+src/**/bin/
+src/**/obj/
+tests/**/bin/
+tests/**/obj/
+.vscode/
+.idea/
+src/GuiaNoivas.Api/Logs/
+*.log
+appsettings*.Local.json
+appsettings.*.Secrets.json
+*.user
+*.suo
+.DS_Store
+Thumbs.db
