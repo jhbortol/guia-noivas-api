@@ -260,14 +260,3 @@ Próximos passos sugeridos
 Arquivo gerado: `docs/api-spec-dotnet9-sqlserver.md`
 
 ---
-
-Se quiser, eu já gero o esqueleto do projeto no repositório com base nesta especificação (opção recomendada para acelerar o start). Caso prefira, gero o OpenAPI YAML/JSON primeiro.
-
-
-
---Implemento endpoints admin (CRUD) e DTOs/automapper.
-Implemento o fluxo de upload com presign para Azure Blob (gerando SAS).
-Crio migrations iniciais e um seed idempotente para categorias.
-
-Rode a geração de migration (criar arquivos Migrations/InitialCreate) aqui manualmente no repositório, ou
-Deixe para você rodar dotnet ef migrations add InitialCreate localmente (recomendado) e eu te assisto com quaisquer erros?

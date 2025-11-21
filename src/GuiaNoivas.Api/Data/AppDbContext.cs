@@ -13,6 +13,9 @@ public class AppDbContext : DbContext
     public DbSet<Categoria> Categorias { get; set; } = null!;
     public DbSet<Media> Media { get; set; } = null!;
     public DbSet<Usuario> Usuarios { get; set; } = null!;
+    public DbSet<RefreshToken> RefreshTokens { get; set; } = null!;
+    public DbSet<ContatoSubmission> ContatoSubmissions { get; set; } = null!;
+    public DbSet<InstitucionalContent> InstitucionalContents { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -27,6 +30,7 @@ public class AppDbContext : DbContext
             b.Property(f => f.Visitas).HasDefaultValue(0);
             b.Property(f => f.Destaque).HasDefaultValue(false);
             b.Property(f => f.SeloFornecedor).HasDefaultValue(false);
+            b.Property(f => f.Rating).HasPrecision(5, 2);
         });
 
         modelBuilder.Entity<Categoria>(b =>
