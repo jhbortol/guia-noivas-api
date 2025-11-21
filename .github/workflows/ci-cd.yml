@@ -34,7 +34,7 @@ jobs:
         run: ls -la src/GuiaNoivas.Api/bin/Release/net9.0/publish || true
 
       - name: FTP Deploy
-        uses: SamKirkland/FTP-Deploy-Action@4.4.0
+        uses: SamKirkland/FTP-Deploy-Action@v4
         with:
           server: ${{ secrets.FTP_HOST }}
           username: ${{ secrets.FTP_USERNAME }}
