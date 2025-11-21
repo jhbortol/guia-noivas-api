@@ -13,6 +13,7 @@ public class AppDbContext : DbContext
     public DbSet<Categoria> Categorias { get; set; } = null!;
     public DbSet<Media> Media { get; set; } = null!;
     public DbSet<Usuario> Usuarios { get; set; } = null!;
+    public DbSet<RefreshToken> RefreshTokens { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
