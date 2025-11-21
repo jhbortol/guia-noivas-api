@@ -140,6 +140,131 @@ Interceptor (AuthInterceptor)
 
 Guards: `AuthGuard`, `RoleGuard` (verifica `Admin`)
 
+---
+
+### AuthInterceptor — comportamento recomendado (detalhado)
+
+- Anexar `Authorization: Bearer <accessToken>` a todas as requisições exceto as da rota `/api/v1/auth`.
+- Gerenciar `401 Unauthorized` com um único fluxo de refresh:
+  - Quando receber 401 em uma requisição não-auth, o interceptor deve **pausar** novas requisições que exigem autenticação e iniciar uma única chamada `POST /api/v1/auth/refresh` com o `refreshToken` armazenado.
+  - Implementar uma fila (queue) para requests pendentes: enquanto o refresh estiver em andamento, as requisições aguardam; quando o refresh completar com sucesso, repetir as requisições pendentes com o novo access token.
+  - Se o refresh falhar (401/invalid), limpar tokens, esvaziar fila com erro e redirecionar para `/auth/login`.
+  - Evitar loops: se a tentativa de refresh for feita e retornar 401, não tentar novamente.
+
+Pseudo-código (Fluxo):
+```
+onRequest(req):
+  if isAuthRequest(req): return next(req)
+  attach accessToken
+  return next(req).catch(err => {
+    if err.status == 401 and !isRefreshing:
+      isRefreshing = true
+      refreshToken().then(newTokens => {
+         update tokens
+         isRefreshing = false
+         retry pending requests
+      }).catch(() => {
+         logout();
+      })
+    enqueue request and return promise that will be resolved after refresh
+  })
+```
+
+Opções de armazenamento dos tokens (recomendação)
+- `accessToken`: manter em memória (no `AuthService.currentUser`/BehaviorSubject). Evita exposição por XSS.
+- `refreshToken`: persistir em `localStorage` por enquanto (faça revisão de segurança e mitigação XSS), planejar migração para cookie httpOnly Secure SameSite quando possível.
+
+---
+
+### AuthService — esqueleto sugerido (TypeScript)
+
+```ts
+export interface AuthResponse { accessToken: string; refreshToken: string; expiresIn: number; user: any }
+
+@Injectable({ providedIn: 'root' })
+export class AuthService {
+  currentUser$ = new BehaviorSubject<User | null>(null)
+  private accessToken?: string
+
+  login(email: string, password: string) { return this.http.post<AuthResponse>(...)
+    .pipe(tap(res => { this.accessToken = res.accessToken; localStorage.setItem('refresh', res.refreshToken); this.currentUser$.next(res.user); })) }
+
+  refresh() { const rt = localStorage.getItem('refresh'); return this.http.post<AuthResponse>('/auth/refresh', { refreshToken: rt }) }
+
+  logout() { const rt = localStorage.getItem('refresh'); this.http.post('/auth/logout', { refreshToken: rt }).subscribe(); localStorage.removeItem('refresh'); this.accessToken = undefined; this.currentUser$.next(null) }
+}
+```
+
+---
+
+### Error handling & ValidationProblem mapping
+
+- Quando o backend retornar `400 ValidationProblem`, o `ErrorInterceptor` deve extrair `errors` do payload e mapear para `FormControl.setErrors({ server: 'mensagem' })` para exibir mensagens inline.
+- Exemplo de payload `ValidationProblem` (ASP.NET):
+```json
+{
+  "type":"https://tools.ietf.org/html/rfc7231#section-6.5.1",
+  "title":"One or more validation errors occurred.",
+  "status":400,
+  "errors":{
+    "Nome":["O campo Nome é obrigatório."],
+    "Email":["Email inválido."]
+  }
+}
+```
+
+Implementação recomendada:
+- No `ErrorInterceptor`, quando `status === 400` e payload contém `errors`, propagar um objeto `{ fieldErrors }` para o componente do formulário que aplicará `setErrors` nos controles correspondentes.
+
+---
+
+### Upload: exemplos práticos (curl)
+
+- Obter presign (Angular usa HttpClient):
+```
+curl -X POST "${API_BASE_URL}/api/v1/media/presign" -H "Authorization: Bearer <token>" -H "Content-Type: application/json" -d '{"filename":"foto.jpg","contentType":"image/jpeg","fornecedorId":"<GUID>"}'
+```
+- Fazer PUT para `uploadUrl` (exemplo usando curl):
+```
+curl -X PUT "<uploadUrl>" -H "x-ms-blob-type: BlockBlob" -H "Content-Type: image/jpeg" --data-binary @foto.jpg
+```
+Nota: o header `x-ms-blob-type: BlockBlob` é necessário para Azure Blob via REST; o `uploadUrl` gerado deve conter SAS com permissões.
+
+---
+
+### CORS e SAS URLs
+
+- Verificar que a Storage Account (Azure) tem CORS configurado para permitir a origem do frontend (Netlify) e os métodos `PUT, GET, OPTIONS` e cabeçalhos `Content-Type, x-ms-blob-type`.
+
+---
+
+### E2E / Smoke tests recomendados
+
+- E2E (Cypress) flows:
+  1. Login como admin → criar fornecedor → abrir detalhe → abrir media manager → upload 1 arquivo → verificar thumbnail
+  2. Login não-admin → tentar acessar `/admin` → verificar bloqueio
+  3. Public: acessar `/fornecedores`, abrir detalhe, enviar contato → confirmar 202
+
+- Script de smoke-test (bash/curl) para rodar após deploy (pode ser job em CI):
+```bash
+#!/usr/bin/env bash
+BASE="${API_BASE_URL}"
+# check public list
+curl -s "${BASE}/fornecedores?page=1&pageSize=1" | jq . >/dev/null || exit 1
+# check swagger reachable (if exposed)
+curl -s -o /dev/null -w "%{http_code}" "${BASE%/api/v1}/swagger/index.html" | grep -E "200|302" || exit 1
+echo "smoke ok"
+```
+
+---
+
+### Segurança e recomendações operacionais
+
+- Forçar HTTPS em produção (Netlify já disponibiliza TLS)
+- Implementar CSP e revisar XSS nas páginas que exibem conteúdo do usuário
+- Planejar migração de `refreshToken` para cookie httpOnly e SameSite
+- Não logar tokens em console/telemetria
+
 --------------------------------------------------------------------------------
 
 9) Contrato de API — endpoints principais
