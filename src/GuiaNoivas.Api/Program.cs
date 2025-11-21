@@ -10,6 +10,9 @@ using GuiaNoivas.Api.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Register a custom authorization result handler that can skip the fallback policy for some paths
+builder.Services.AddSingleton<Microsoft.AspNetCore.Authorization.Policy.IAuthorizationMiddlewareResultHandler, GuiaNoivas.Api.SkipPathAuthorizationResultHandler>();
+
 builder.Configuration.AddEnvironmentVariables();
 
 // Serilog
@@ -154,20 +157,12 @@ app.UseRouting();
 app.UseAuthentication();
 // Serve static files before authorization so Swagger UI files are accessible
 app.UseStaticFiles();
-// Bypass authorization for Swagger static files
-app.Use(async (context, next) =>
-{
-    var path = context.Request.Path.Value;
-    if (path != null && path.StartsWith("/swagger"))
-    {
-        await next();
-        return;
-    }
-    await next();
-});
-app.UseAuthorization();
 
+// Register Swagger UI before authorization so it is not blocked by the fallback policy
 app.UseSwagger();
+app.UseSwaggerUI();
+
+app.UseAuthorization();
 
 app.UseEndpoints(endpoints =>
 {
