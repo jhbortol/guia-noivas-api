@@ -36,7 +36,7 @@ jobs:
           server: ${{ secrets.FTP_HOST }}
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.ftp_password }}
-          local-dir: src/GuiaNoivas.Api/bin/Release/net9.0/publish
+          local-dir: src/GuiaNoivas.Api/bin/Release/net9.0/publish/
           server-dir: ${{ env.FTP_REMOTE_PATH }}
         env:
           FTP_REMOTE_PATH: ${{ secrets.FTP_REMOTE_PATH }}
