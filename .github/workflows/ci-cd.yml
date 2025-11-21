@@ -41,7 +41,7 @@ jobs:
           local-dir: ./publish/
           server-dir: ${{ env.FTP_REMOTE_PATH }}
         env:
-          FTP_REMOTE_PATH: ${{ secrets.FTP_REMOTE_PATH }}
+          FTP_REMOTE_PATH: ${{ endsWith(secrets.FTP_REMOTE_PATH, '/') && secrets.FTP_REMOTE_PATH || format('{0}/', secrets.FTP_REMOTE_PATH) }}
 
       - name: Deployment complete
         if: success()
