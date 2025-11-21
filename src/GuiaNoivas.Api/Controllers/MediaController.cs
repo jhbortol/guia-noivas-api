@@ -90,6 +90,37 @@ public class MediaController : ControllerBase
         await db.SaveChangesAsync();
         return NoContent();
     }
+
+    [HttpPost("{id:guid}/mark-primary")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> MarkPrimary(Guid id)
+    {
+        var db = HttpContext.RequestServices.GetRequiredService<GuiaNoivas.Api.Data.AppDbContext>();
+        var media = await db.Media.FindAsync(id);
+        if (media == null) return NotFound();
+        if (media.FornecedorId == null) return BadRequest(new { message = "Media has no FornecedorId" });
+
+        var fornecedorId = media.FornecedorId.Value;
+
+        using var tx = await db.Database.BeginTransactionAsync();
+        try
+        {
+            // unset other primary flags for this fornecedor
+            var others = db.Media.Where(m => m.FornecedorId == fornecedorId && m.Id != id && m.IsPrimary);
+            await others.ForEachAsync(m => m.IsPrimary = false);
+
+            media.IsPrimary = true;
+            db.Media.Update(media);
+            await db.SaveChangesAsync();
+            await tx.CommitAsync();
+            return NoContent();
+        }
+        catch (Exception ex)
+        {
+            await tx.RollbackAsync();
+            return StatusCode(500, new { error = "Failed to mark primary", details = ex.Message });
+        }
+    }
 }
 
 public record CreateMediaDto(Guid? FornecedorId, string? Url, string? Filename, string? ContentType, int? Width, int? Height, bool IsPrimary);
