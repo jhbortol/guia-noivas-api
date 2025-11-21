@@ -10,9 +10,6 @@ using GuiaNoivas.Api.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Register a custom authorization result handler that can skip the fallback policy for some paths
-builder.Services.AddSingleton<Microsoft.AspNetCore.Authorization.Policy.IAuthorizationMiddlewareResultHandler, GuiaNoivas.Api.SkipPathAuthorizationResultHandler>();
-
 builder.Configuration.AddEnvironmentVariables();
 
 // Serilog
@@ -158,17 +155,21 @@ app.UseAuthentication();
 // Serve static files before authorization so Swagger UI files are accessible
 app.UseStaticFiles();
 
-// Register Swagger UI before authorization so it is not blocked by the fallback policy
-app.UseSwagger();
-app.UseSwaggerUI();
+// Map /swagger to a branch that does not run the global authorization middleware.
+// This ensures Swagger UI static files are served without the fallback policy blocking them.
+app.MapWhen(ctx => ctx.Request.Path.StartsWithSegments("/swagger"), branch =>
+{
+    branch.UseStaticFiles();
+    branch.UseSwagger();
+    branch.UseSwaggerUI();
+    branch.Run(context => System.Threading.Tasks.Task.CompletedTask);
+});
 
 app.UseAuthorization();
 
 app.UseEndpoints(endpoints =>
 {
     endpoints.MapControllers();
-    // Swagger UI endpoint - allow anonymous
-    // Removed custom redirect to avoid infinite loop. Swagger static files are served by app.UseSwaggerUI().
     // Hangfire dashboard endpoint - allow anonymous
     endpoints.MapHangfireDashboard("/hangfire", new Hangfire.DashboardOptions
     {
