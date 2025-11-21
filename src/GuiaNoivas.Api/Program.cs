@@ -159,15 +159,19 @@ app.UseWhen(ctx => ctx.Request.Path.StartsWithSegments("/swagger"), appBuilder =
 {
     appBuilder.Use((context, next) => next()); // Bypass auth for swagger
 });
+app.UseRouting();
+app.UseAuthentication();
+app.UseAuthorization();
+
+// Swagger endpoints - allow anonymous access
 app.UseSwagger();
 app.UseSwaggerUI();
 
-// Hangfire dashboard - liberar acesso anônimo mesmo em produção
-app.UseWhen(ctx => ctx.Request.Path.StartsWithSegments("/hangfire"), appBuilder =>
+// Hangfire dashboard - allow anonymous access using custom filter
+app.UseHangfireDashboard("/hangfire", new Hangfire.DashboardOptions
 {
-    appBuilder.Use((context, next) => next()); // Bypass auth for hangfire
+    Authorization = new[] { new GuiaNoivas.Api.AllowAnonymousAuthorizationFilter() }
 });
-app.UseHangfireDashboard("/hangfire");
 
 app.MapControllers();
 
