@@ -1,15 +1,15 @@
 Front-end Specification — Guia Noivas
 
-Versão: 2025-11-21
+Versão: 2025-11-21 (revisado)
 
-Propósito: este documento descreve todos os requisitos e especificações para a squad frontend implementar a aplicação SPA em Angular 19 que consome a API `guia-noivas-api`.
+Propósito: este documento descreve os requisitos, contratos de API e orientações de implementação para a aplicação SPA (Angular 19) que consome a API `guia-noivas-api`. O objetivo é garantir coerência entre frontend e backend (endpoints, DTOs, fluxos de upload, autenticação e critérios de QA/E2E).
 
 Visão geral
 - Framework: Angular 19 (TypeScript, RxJS)
 - Hospedagem: Netlify (build: `ng build --configuration=production`)
 - Autenticação: JWT (Bearer) + Refresh Token (endpoints no backend em `/api/v1/auth`)
-- Upload de imagens: fluxo presign -> PUT direto para `uploadUrl` (SAS) -> POST metadata (`/api/v1/media`)
-- Observação: Não usar KeyVault, Application Insights ou Redis.
+ - Upload de imagens: o upload é realizado diretamente pelo backend via endpoint dedicado, amarrando a imagem ao fornecedor. O frontend envia o arquivo e os metadados para o backend, que realiza o armazenamento e retorna a URL pública.
+- Observação operacional: a infra usa SQL Server em produção; nos testes locais/integrados usamos SQLite — o frontend não precisa tratar isso, mas testes automatizados devem considerar diferenças de API quando aplicável.
 
 Conteúdo deste documento
 - Requisitos funcionais
@@ -17,314 +17,298 @@ Conteúdo deste documento
 - Componentes e páginas
 - Formulários (campos, validações, botões)
 - Grids e listagens
-- Fluxo de upload de imagens (detalhado)
+- Fluxo de upload de imagens (detalhado) + contratos presign
 - Autenticação e armazenamento de tokens
 - Serviços, Interceptors e Guards sugeridos
-- Contrato de API (endpoints e exemplos de payload)
+- Contrato de API (endpoints, DTOs e exemplos)
 - UX / Acessibilidade / Notificações
 - Netlify / Deploy / Dev proxy
-- QA / Critérios de aceitação
-- Backlog de tarefas e estimativas
+- QA / Critérios de aceitação e E2E
+- CI/CD (migrations & smoke-tests)
+- Backlog e estimativas
 
 --------------------------------------------------------------------------------
 
 1) Requisitos funcionais (resumido)
 
 - Usuários públicos: visualizar lista de fornecedores, ver detalhe por slug, enviar contato.
-- Administradores (`Role = Admin`): criar, editar, excluir fornecedores; gerenciar imagens (upload via presign e associar metadados).
-- Sistema de autenticação: login, registro, refresh de tokens e logout.
-- Uploads de imagens: presign (API) + upload direto para storage + criação de metadados na API.
+- Administradores (`Role = Admin`): criar, editar, excluir fornecedores; gerenciar imagens (upload via presign e associar metadados); marcar imagem principal.
+- Sistema de autenticação: login, refresh de tokens e logout. Operações admin exigem claim `Role=Admin`.
+ - Uploads de imagens: o frontend envia o arquivo e os metadados via endpoint dedicado para o backend, que realiza o upload, associa ao fornecedor e retorna a URL pública. O frontend deve reagir a erros de upload e exibir progresso.
 
-Regra importante: Um Fornecedor deve existir antes de associar imagens a ele (criar fornecedor primeiro, depois enviar imagens com `FornecedorId`).
+Regra importante: Um Fornecedor deve existir antes de associar imagens a ele (criar fornecedor primeiro, depois enviar imagens com `fornecedorId`). O frontend deve validar isso e evitar iniciar upload para recursos inexistentes. O upload é sempre feito pelo backend, nunca direto para storage.
 
 --------------------------------------------------------------------------------
 
 2) Rotas (SPA)
 
 - `/` — Home (destaques)
-- `/fornecedores` — Lista pública com paginação
+- `/fornecedores` — Lista pública com paginação e filtros
 - `/fornecedores/:slug` — Detalhes do fornecedor (galeria + contato)
 - `/auth/login` — Login
-- `/auth/register` — Registro
+- `/auth/register` — Registro (se aplicável)
 - `/admin` — Dashboard admin (protegido)
   - `/admin/fornecedores` — Grid admin
   - `/admin/fornecedores/new` — Formulário criar
   - `/admin/fornecedores/:id/edit` — Formulário editar
-  - `/admin/fornecedores/:id/media` — Gerenciador de imagens do fornecedor
+  - `/admin/fornecedores/:id/media` — Gerenciador de imagens do fornecedor (upload/list/reorder/delete)
 
 --------------------------------------------------------------------------------
 
 3) Estrutura de projeto sugerida
 
 - `src/app/core/` — serviços centrais: `auth.service.ts`, `api.service.ts`, `blob.service.ts`, `interceptors/`, `guards/`
-- `src/app/shared/` — UI components (toasts, modal confirm, spinner, pagination)
+- `src/app/shared/` — UI components (toasts, modal confirm, spinner, pagination, empty-state)
 - `src/app/features/fornecedores/` — `list/`, `detail/`, `form/`, `media/`
 - `proxy.conf.json` — proxy para desenvolvimento (`/api` → `https://localhost:5001`)
 - `netlify.toml` — config Netlify
+
+Observação: mantenha os serviços pequenos e testáveis; prefira `HttpClient` com métodos centrados em contratos (DTOs) e mapeamento de erros central.
 
 --------------------------------------------------------------------------------
 
 4) Componentes / Páginas (detalhado)
 
-- `FornecedoresListComponent`: grid com paginação server-side, filtros por nome/cidade, ações (view/edit/media/delete)
-- `FornecedorDetailComponent`: dados do fornecedor, galeria de imagens, contato e botão de visita
-- `FornecedorFormComponent`: formulário reusável para create/edit
-- `MediaManagerComponent`: upload em lote, preview, progresso, deletar
-- `LoginComponent`, `RegisterComponent`
+- `FornecedoresListComponent`: grid com paginação server-side, filtros por nome/cidade, ações (view/edit/media/delete). Implementar debounce nos filtros.
+- `FornecedorDetailComponent`: dados do fornecedor, galeria de imagens (lazy load), contato público e botão para registrar visita (POST `/fornecedores/{id}/visit`).
+- `FornecedorFormComponent`: formulário reusável para create/edit (exibir validações do servidor).
+ - `MediaManagerComponent`: upload em lote (via backend), preview, progresso, deletar, marcar primária, reordenar (ou endpoint de prioridade)
+- `LoginComponent`, `RegisterComponent`, `AdminLayoutComponent`
 
 --------------------------------------------------------------------------------
 
-5) Formulários — campos, validações, botões
+5) Formulários — campos, validações, botões (contrato com backend)
 
-Fornecedor (Create/Edit)
-- Nome: required, maxlength 200
-- Slug: optional, maxlength 200 (auto-gerar se vazio)
-- Descrição: optional, maxlength 4000
-- Cidade: optional, maxlength 100
-- Telefone: optional, maxlength 50
-- Email: optional, maxlength 200, email validator
-- Website: optional, maxlength 250, URL validator
-- Destaque: boolean
-- SeloFornecedor: boolean
-- Rating: decimal optional 0..5 (step 0.1)
+Fornecedor (Create/Edit) — DTO esperado no backend (`FornecedorCreateDto` / `FornecedorUpdateDto`)
+- `nome` (string, required, max 200)
+- `slug` (string, optional, max 200) — frontend pode auto-gerar `slug` baseado no `nome` e permitir edição
+- `descricao` (string, optional, max 4000)
+- `cidade` (string, optional, max 100)
+- `telefone` (string, optional, max 50)
+- `email` (string, optional, max 200, email format)
+- `website` (string, optional, max 250, URL format)
+- `destaque` (bool)
+- `seloFornecedor` (bool)
+- `rating` (decimal?, optional 0..5)
+- `categoriaId` (GUID?, optional) — validate existence client-side if selected
 
-Botões: `Salvar` (primary), `Cancelar`, `Excluir` (danger — somente em edição)
+Botões: `Salvar` (primary), `Cancelar`, `Excluir` (danger — somente em edição e exibido conforme role)
 
 Contact form (public)
-- Nome (required), Email (required), Telefone (opcional), Mensagem (required, maxlength 2000)
+- `nome` (required), `email` (required), `telefone` (optional), `mensagem` (required, max 2000)
 
-Media metadata form (admin) — campos: FornecedorId (required), Url, Filename, ContentType, Width, Height, IsPrimary
+Media metadata (CreateMediaDto)
+- `fornecedorId` (GUID, required)
+- `url` (string, required) — publicUrl or storage URL
+- `filename` (string)
+- `contentType` (string)
+- `width` (int?), `height` (int?)
+- `isPrimary` (bool)
 
-Validação: implementar validação client-side refletindo atributos do backend e mapear `ValidationProblem` do servidor para os campos.
+Validação: implementar validação client-side refletindo as regras acima e mapear `ValidationProblem` do servidor para cada campo usando `setErrors`.
 
 --------------------------------------------------------------------------------
 
 6) Grids / Listagens
 
-- Fornecedores grid (desktop): Nome, Cidade, Rating, Destaque, Visitas, Actions
-- Paginação server-side (page, pageSize); pageSize options: 12/24/48
-- Filtros: nome, cidade
+- Fornecedores grid (desktop): colunas principais — Nome, Cidade, Rating, Destaque, Visitas, Actions (View/Edit/Media/Delete)
+- Paginação server-side: query params `page` (int), `pageSize` (int), `categoriaId` (GUID optional)
+- pageSize options: 12/24/48
+- Filtros: nome (text, contains), cidade (text)
 - Empty state com CTA criar (admin)
 
---------------------------------------------------------------------------------
-
-7) Fluxo de upload de imagens (presign → PUT → metadata)
-
-Passos por arquivo:
-1. `POST /api/v1/media/presign` — Body: `{ Filename, ContentType, FornecedorId }` (Auth)
-2. Receber `{ uploadUrl, blobName, publicUrl? }`
-3. `PUT uploadUrl` com header `Content-Type` correto e corpo do arquivo
-4. `POST /api/v1/media` (Admin) com `CreateMediaDto` para criar metadados
-5. Atualizar UI com thumbnail
-
-UX: progress bars, retries, bulk upload, preview
-
-Observação: confirmar CORS nas SAS URLs com infra
+API contract note: the API returns `{ data: [...], meta: { total, page, pageSize } }` for paged endpoints.
 
 --------------------------------------------------------------------------------
 
-8) Autenticação — detalhes
+7) Fluxo de upload de imagens (presign → PUT → metadata) — contrato e exemplos
 
-Armazenamento de tokens
-- `accessToken` em memória (AuthService)
-- `refreshToken` em `localStorage` (documentar risco XSS; ideal migrar para httpOnly cookie no futuro)
+Fluxo de upload de imagens (upload via backend) — contrato e exemplos
 
-Fluxo
-- Login: `POST /api/v1/auth/login` → `{ accessToken, refreshToken, expiresIn, user }`
-- Refresh: `POST /api/v1/auth/refresh` → novos tokens
-- Logout: `POST /api/v1/auth/logout` → limpar tokens localmente
+Resumo rápido (novo fluxo):
+1) Frontend envia `POST /api/v1/media/upload` (multipart/form-data) com o arquivo da imagem e os metadados (`fornecedorId`, `filename`, `contentType`, `isPrimary`, etc).
+2) Backend realiza o upload, associa a imagem ao fornecedor, armazena e retorna a URL pública e os dados persistidos.
 
-Interceptor (AuthInterceptor)
-- Adiciona Authorization header nas requests
-- Em 401 (não para auth/refresh): tenta refresh (uma vez), reenvia request se obtiver novo token; se falhar, redireciona para login
-
-Guards: `AuthGuard`, `RoleGuard` (verifica `Admin`)
-
----
-
-### AuthInterceptor — comportamento recomendado (detalhado)
-
-- Anexar `Authorization: Bearer <accessToken>` a todas as requisições exceto as da rota `/api/v1/auth`.
-- Gerenciar `401 Unauthorized` com um único fluxo de refresh:
-  - Quando receber 401 em uma requisição não-auth, o interceptor deve **pausar** novas requisições que exigem autenticação e iniciar uma única chamada `POST /api/v1/auth/refresh` com o `refreshToken` armazenado.
-  - Implementar uma fila (queue) para requests pendentes: enquanto o refresh estiver em andamento, as requisições aguardam; quando o refresh completar com sucesso, repetir as requisições pendentes com o novo access token.
-  - Se o refresh falhar (401/invalid), limpar tokens, esvaziar fila com erro e redirecionar para `/auth/login`.
-  - Evitar loops: se a tentativa de refresh for feita e retornar 401, não tentar novamente.
-
-Pseudo-código (Fluxo):
+Exemplo de request (multipart/form-data):
 ```
-onRequest(req):
-  if isAuthRequest(req): return next(req)
-  attach accessToken
-  return next(req).catch(err => {
-    if err.status == 401 and !isRefreshing:
-      isRefreshing = true
-      refreshToken().then(newTokens => {
-         update tokens
-         isRefreshing = false
-         retry pending requests
-      }).catch(() => {
-         logout();
-      })
-    enqueue request and return promise that will be resolved after refresh
-  })
+POST /api/v1/media/upload
+Content-Type: multipart/form-data
+
+Campos:
+- file: arquivo da imagem
+- fornecedorId: GUID
+- filename: string
+- contentType: string
+- isPrimary: bool
+- width: int (opcional)
+- height: int (opcional)
 ```
 
-Opções de armazenamento dos tokens (recomendação)
-- `accessToken`: manter em memória (no `AuthService.currentUser`/BehaviorSubject). Evita exposição por XSS.
-- `refreshToken`: persistir em `localStorage` por enquanto (faça revisão de segurança e mitigação XSS), planejar migração para cookie httpOnly Secure SameSite quando possível.
-
----
-
-### AuthService — esqueleto sugerido (TypeScript)
-
-```ts
-export interface AuthResponse { accessToken: string; refreshToken: string; expiresIn: number; user: any }
-
-@Injectable({ providedIn: 'root' })
-export class AuthService {
-  currentUser$ = new BehaviorSubject<User | null>(null)
-  private accessToken?: string
-
-  login(email: string, password: string) { return this.http.post<AuthResponse>(...)
-    .pipe(tap(res => { this.accessToken = res.accessToken; localStorage.setItem('refresh', res.refreshToken); this.currentUser$.next(res.user); })) }
-
-  refresh() { const rt = localStorage.getItem('refresh'); return this.http.post<AuthResponse>('/auth/refresh', { refreshToken: rt }) }
-
-  logout() { const rt = localStorage.getItem('refresh'); this.http.post('/auth/logout', { refreshToken: rt }).subscribe(); localStorage.removeItem('refresh'); this.accessToken = undefined; this.currentUser$.next(null) }
+Exemplo de response:
+```json
+{
+  "id": "{GUID}",
+  "fornecedorId": "{GUID}",
+  "url": "https://cdn.example.com/media/...jpg",
+  "filename": "foto.jpg",
+  "contentType": "image/jpeg",
+  "width": 1200,
+  "height": 800,
+  "isPrimary": false
 }
 ```
 
----
+Endpoint adicional recomendado: `GET /api/v1/media?fornecedorId={GUID}` — lista as medias associadas ao fornecedor.
 
-### Error handling & ValidationProblem mapping
+UX: exibir progress bar por arquivo, retries automáticos para falhas de rede (com backoff) e um estado de erro que permite tentar enviar novamente ou remover o item. O upload é sempre feito pelo backend, nunca direto para storage.
 
-- Quando o backend retornar `400 ValidationProblem`, o `ErrorInterceptor` deve extrair `errors` do payload e mapear para `FormControl.setErrors({ server: 'mensagem' })` para exibir mensagens inline.
-- Exemplo de payload `ValidationProblem` (ASP.NET):
+--------------------------------------------------------------------------------
+
+8) Autenticação — recomendações de implementação no frontend
+
+Armazenamento de tokens (recomendado por agora)
+- `accessToken`: armazenar em memória (AuthService) e expor via `BehaviorSubject`.
+- `refreshToken`: armazenar em `localStorage` (temporário) OU preferir cookie httpOnly Secure SameSite se infraestrutura permitir.
+
+Fluxo (recap):
+- Login: `POST /api/v1/auth/login` → `{ accessToken, refreshToken, expiresIn, user }`
+- Interceptor (AuthInterceptor) anexa `Authorization: Bearer <accessToken>` a requests protegidas.
+- Em caso de 401: disparar um fluxo único de refresh (POST `/api/v1/auth/refresh`) e enfileirar requests até o refresh completar, conforme pseudo-código abaixo.
+
+AuthInterceptor — fluxo recomendado (implementação resumida)
+- Antes de enviar request: se rota inicia por `/api/v1/auth` não anexar token.
+- Em erro 401: se não estiver em refresh, iniciar refresh; enfileirar as demais requests. Quando refresh retorna novo token, repetir as requests; se refresh falhar, logout e redirecionar para login.
+
+Pseudocódigo (esqueleto TypeScript já usado pela equipe):
+
+```ts
+// comportamento resumido: attach token, handle 401 with single refresh operation and a queue
+```
+
+Obs.: documentar o formato do payload de login/refresh para o time de frontend (veja seção Contrato de API).
+
+--------------------------------------------------------------------------------
+
+9) Error handling & ValidationProblem mapping (detalhado)
+
+- Quando o backend retornar `400 ValidationProblem` (padrão ASP.NET), o `ErrorInterceptor` deve extrair `errors` e repassar para o componente para aplicar `setErrors` nos controles.
+- Exemplo de payload (será retornado pela API):
+
 ```json
 {
-  "type":"https://tools.ietf.org/html/rfc7231#section-6.5.1",
-  "title":"One or more validation errors occurred.",
-  "status":400,
-  "errors":{
-    "Nome":["O campo Nome é obrigatório."],
-    "Email":["Email inválido."]
+  "type": "https://tools.ietf.org/html/rfc7231#section-6.5.1",
+  "title": "One or more validation errors occurred.",
+  "status": 400,
+  "errors": {
+    "Nome": ["O campo Nome é obrigatório."],
+    "Email": ["Email inválido."]
   }
 }
 ```
 
-Implementação recomendada:
-- No `ErrorInterceptor`, quando `status === 400` e payload contém `errors`, propagar um objeto `{ fieldErrors }` para o componente do formulário que aplicará `setErrors` nos controles correspondentes.
-
----
-
-### Upload: exemplos práticos (curl)
-
-- Obter presign (Angular usa HttpClient):
-```
-curl -X POST "${API_BASE_URL}/api/v1/media/presign" -H "Authorization: Bearer <token>" -H "Content-Type: application/json" -d '{"filename":"foto.jpg","contentType":"image/jpeg","fornecedorId":"<GUID>"}'
-```
-- Fazer PUT para `uploadUrl` (exemplo usando curl):
-```
-curl -X PUT "<uploadUrl>" -H "x-ms-blob-type: BlockBlob" -H "Content-Type: image/jpeg" --data-binary @foto.jpg
-```
-Nota: o header `x-ms-blob-type: BlockBlob` é necessário para Azure Blob via REST; o `uploadUrl` gerado deve conter SAS com permissões.
-
----
-
-### CORS e SAS URLs
-
-- Verificar que a Storage Account (Azure) tem CORS configurado para permitir a origem do frontend (Netlify) e os métodos `PUT, GET, OPTIONS` e cabeçalhos `Content-Type, x-ms-blob-type`.
-
----
-
-### E2E / Smoke tests recomendados
-
-- E2E (Cypress) flows:
-  1. Login como admin → criar fornecedor → abrir detalhe → abrir media manager → upload 1 arquivo → verificar thumbnail
-  2. Login não-admin → tentar acessar `/admin` → verificar bloqueio
-  3. Public: acessar `/fornecedores`, abrir detalhe, enviar contato → confirmar 202
-
-- Script de smoke-test (bash/curl) para rodar após deploy (pode ser job em CI):
-```bash
-#!/usr/bin/env bash
-BASE="${API_BASE_URL}"
-# check public list
-curl -s "${BASE}/fornecedores?page=1&pageSize=1" | jq . >/dev/null || exit 1
-# check swagger reachable (if exposed)
-curl -s -o /dev/null -w "%{http_code}" "${BASE%/api/v1}/swagger/index.html" | grep -E "200|302" || exit 1
-echo "smoke ok"
-```
-
----
-
-### Segurança e recomendações operacionais
-
-- Forçar HTTPS em produção (Netlify já disponibiliza TLS)
-- Implementar CSP e revisar XSS nas páginas que exibem conteúdo do usuário
-- Planejar migração de `refreshToken` para cookie httpOnly e SameSite
-- Não logar tokens em console/telemetria
+Implementação prática:
+- `ErrorInterceptor` detecta `status === 400` e `body.errors` → transforma em `{ fieldErrors: Record<string,string[]> }` e repassa no `HttpErrorResponse` (ou lança um custom error) que o componente tenta mapear para `FormGroup`.
 
 --------------------------------------------------------------------------------
 
-9) Contrato de API — endpoints principais
+10) Contrato de API — endpoints, DTOs e exemplos (completos)
 
 Base: `${API_BASE_URL}/api/v1`
 
 Auth
-- `POST /auth/login`
-- `POST /auth/register`
-- `POST /auth/refresh`
-- `POST /auth/logout`
+- `POST /auth/login`  
+  Request:
+  ```json
+  { "email": "admin@example.com", "password": "Secret123!" }
+  ```
+  Response (200):
+  ```json
+  { "accessToken": "...", "refreshToken": "...", "expiresIn": 3600, "user": { "id": "...", "email": "...", "roles": ["Admin"] } }
+  ```
 
-Fornecedores
-- `GET /fornecedores?page=&pageSize=`
-- `GET /fornecedores/slug/{slug}`
-- `POST /fornecedores/{id}/contact` (ContactDto)
+- `POST /auth/refresh`  
+  Request:
+  ```json
+  { "refreshToken": "..." }
+  ```
+  Response (200): novo par `accessToken`/`refreshToken`.
 
-Admin Fornecedores
-- `POST /admin/fornecedores`
-- `PUT /admin/fornecedores/{id}`
-- `PATCH /admin/fornecedores/{id}/destaque`
-- `DELETE /admin/fornecedores/{id}`
+Fornecedores (público)
+- `GET /fornecedores?page=&pageSize=&categoriaId=`  
+  Response shape:
+  ```json
+  { "data": [ { /* FornecedorListDto */ } ], "meta": { "total": 123, "page": 1, "pageSize": 12 } }
+  ```
+
+- `GET /fornecedores/slug/{slug}` — retorna `FornecedorDetailDto` (ver exemplo abaixo)
+
+Fornecedor DTOs (exemplos)
+- FornecedorListDto (server → client)
+  ```json
+  {
+    "id": "{GUID}",
+    "nome": "Ateliê Flores & Cia",
+    "slug": "atelie-flores-cia",
+    "descricao": "...",
+    "cidade": "São Paulo",
+    "rating": 4.7,
+    "destaque": true,
+    "seloFornecedor": false,
+    "ativo": true,
+    "categoria": { "id": "{GUID}", "nome": "Decoração", "slug": "decoracao" },
+    "thumbnail": { "id": "{GUID}", "url": "https://.../thumb.jpg", "isPrimary": true }
+  }
+  ```
+
+- FornecedorDetailDto (server → client)
+  ```json
+  {
+    "id": "{GUID}",
+    "nome": "...",
+    "slug": "...",
+    "descricao": "...",
+    "cidade": "...",
+    "telefone": "...",
+    "email": "...",
+    "website": "...",
+    "destaque": true,
+    "seloFornecedor": false,
+    "ativo": true,
+    "rating": 4.7,
+    "visitas": 123,
+    "createdAt": "2025-11-21T...",
+    "updatedAt": null,
+    "medias": [ { "id": "{GUID}", "url": "...", "filename": "...", "contentType": "image/jpeg", "isPrimary": true } ],
+    "categoria": { "id": "{GUID}", "nome": "...", "slug": "..." }
+  }
+  ```
+
+Admin Fornecedores (require Admin role)
+- `POST /admin/fornecedores` — request `FornecedorCreateDto` (veja seção 5)
+- `PUT /admin/fornecedores/{id}` — update
+- `PATCH /admin/fornecedores/{id}/destaque` — toggles destaque
+- `DELETE /admin/fornecedores/{id}` — remove fornecedor (should cascade delete medias or set null per DB rules)
 
 Media
-- `POST /media/presign` (Auth)
-- `POST /media` (Admin)
-- `DELETE /media/{id}` (Admin)
+- `POST /media/upload` — upload de imagem e metadados (Admin). Body: multipart/form-data conforme seção 7.
+- `GET /media?fornecedorId={GUID}` — lista medias para um fornecedor (público ou admin conforme design).
+- `DELETE /media/{id}` — remove media (Admin).
 
-Exemplos rápidos (copiar/colar)
-- Login
-```json
-{ "email":"admin@example.com", "password":"Secret123!" }
-```
-- Create fornecedor
-```json
-{
-  "nome":"Ateliê Flores & Cia",
-  "slug":"atelie-flores-cia",
-  "descricao":"...",
-  "cidade":"São Paulo",
-  "telefone":"(11)99999-9999",
-  "email":"contato@atelieflores.com",
-  "website":"https://atelieflores.com",
-  "destaque": true,
-  "seloFornecedor": false,
-  "rating": 4.7
-}
-```
+Error shapes
+- Validation (400): `ValidationProblem` as shown in section 9.
+- Unauthorized (401): `{ message: 'Unauthorized' }` or 401 status (interceptor handles).
 
 --------------------------------------------------------------------------------
 
-10) UX / Acessibilidade / Notificações
+11) UX / Acessibilidade / Notificações
 
-- Use markup semântico, `aria-label` nos botões, foco visível e leitores de tela compatíveis
-- Toast para sucessos/erros
-- Modal confirm para deletes
+- Use markup semântico, `aria-*` attributes, foco visível, contraste adequado e keyboard navigation.
+- Toasts para sucessos/erros; modal confirm para ações destrutivas (delete).
+- Em upload: mostrar progress bar por arquivo, contagem de uploads pendentes, e feedback de sucesso/erro por item.
 
 --------------------------------------------------------------------------------
 
-11) Netlify / Build / Dev proxy
+12) Netlify / Build / Dev proxy
 
 netlify.toml (exemplo)
 ```toml
@@ -338,53 +322,112 @@ netlify.toml (exemplo)
   status = 200
 ```
 
-proxy.conf.json (dev)
+`proxy.conf.json` (dev)
 ```json
 {
   "/api": { "target": "https://localhost:5001", "secure": false, "changeOrigin": true }
 }
 ```
 
-Env vars Netlify:
+Env vars Netlify recomendadas:
 - `API_BASE_URL` = `https://guia-noivas.somee.com/api/v1`
+- `NG_BUILD_CONFIGURATION` = `production`
 
 --------------------------------------------------------------------------------
 
-12) QA / Critérios de aceitação
+13) QA / Critérios de aceitação e E2E (detalhado)
 
-- Login/refresh/logout automático
-- Guards bloqueiam rotas admin
-- CRUD admin com validação e mensagens do servidor
-- Upload via presign funcionando
-- Contact form responde 202
+Critérios automáticos (unit/integration/E2E):
+- Login/refresh/logout automático com interceptor e queue de refresh.
+- Guards bloqueiam rotas admin para usuários sem role.
+- CRUD admin com validação server-side exibida no frontend.
+ - Upload funcionando: frontend envia arquivo e metadados para o backend via `/media/upload`, backend realiza o upload, associa ao fornecedor e retorna a thumbnail.
+- Contact form responde 202 e exibe confirmação.
+
+E2E (Cypress) suggested flows (concrete):
+1. Admin create + upload flow
+  - Login as admin (seed user or test account)
+  - POST create fornecedor via UI
+  - Open media manager for created fornecedor
+  - Upload one image: enviar arquivo e metadados via `/media/upload` (multipart/form-data)
+  - Assert thumbnail appears and `isPrimary` can be toggled
+
+2. Public contact
+   - Visit fornecedor detail, fill contact form, submit, assert 202 and visible confirmation
+
+3. Authorization guard
+   - Attempt to access `/admin/fornecedores` as anonymous or non-admin and assert redirect/403 UI
+
+Smoke tests (CI) — minimal curl script
+```bash
+#!/usr/bin/env bash
+BASE="${API_BASE_URL}"
+# 1) public list
+curl -s "${BASE}/fornecedores?page=1&pageSize=1" | jq . >/dev/null || exit 1
+# 2) admin login + create fornecedor (requires test admin credentials set in CI secrets)
+ # 3) upload via backend
+echo "smoke ok"
+```
+
+CI/CD recommendation (GitHub Actions)
+- Job `migrations`: run the committed idempotent SQL script `src/GuiaNoivas.Api/Data/Migrations/sql/ef_set_delete_behavior_idempotent.sql` against the target DB (use secure connection string secret). Prefer ops review. If runner has .NET SDK and permission, use `dotnet ef database update`.
+- Job `smoke-test`: after deploy, run smoke curl script and optional headless E2E.
 
 --------------------------------------------------------------------------------
 
-13) Backlog técnico (tarefas e estimativas)
+14) Backlog técnico (tarefas e estimativas) — atualizado
 
 - Inicialização + Netlify: 4h
 - AuthService + Interceptor + Guards: 10h
-- Lista Fornecedores: 10h
+- Lista Fornecedores: 8h
 - Detalhe + Contato: 6h
-- Admin CRUD: 14h
-- MediaManager: 14h
+- Admin CRUD: 12h
+  - MediaManager (upload/preview/reorder): 16h
 - Shared components: 6h
-- E2E tests: 8h
-- Docs & deploy: 4h
+- E2E tests (Cypress): 10h
+- Docs, Swagger examples & deploy scripts: 6h
 
-Estimativa total ≈ 76h
-
---------------------------------------------------------------------------------
-
-14) Próximos passos sugeridos
-
-1. Implementar AuthService + AuthInterceptor
-2. Implementar listagem pública e detalhe
-3. Implementar CRUD admin
-4. Implementar MediaManager
+Estimativa total ≈ 78h (ajustado)
 
 --------------------------------------------------------------------------------
 
-Documento gerado para a squad frontend. Para dúvidas, abrir issue com etiqueta `frontend-spec`.
+15) Próximos passos recomendados (prioridade)
+
+Alta:
+- Implementar `GET /api/v1/media?fornecedorId={id}` no frontend (consumir endpoint já disponível) e adicionar UI de listagem no `MediaManager`.
+- Implementar upload flow completo no frontend (POST `/media/upload` com arquivo e metadados), e testes integration.
+- Escrever E2E básico Cypress cobrindo create fornecedor + upload + mark-primary.
+
+Média:
+- Adicionar exemplos de request/response no Swagger (backend) e exportar exemplos JSON para o frontend.
+- Implementar `DatabaseSeeder` para povoar categorias/fornecedores em dev.
+
+Baixa:
+- Pipeline CI para aplicar scripts idempotentes e rodar smoke-tests; checklist operacional de storage CORS/SAS.
+
+--------------------------------------------------------------------------------
+
+16) Anexos técnicos rápidos (copiar/colar)
+
+
+  - Upload example (Angular HttpClient)
+```ts
+const formData = new FormData();
+formData.append('file', file);
+formData.append('fornecedorId', fornecedorId);
+formData.append('filename', file.name);
+formData.append('contentType', file.type);
+formData.append('isPrimary', isPrimary);
+this.http.post(`${API_BASE}/media/upload`, formData);
+```
+
+--------------------------------------------------------------------------------
+
+Documento revisado para a squad frontend. Se quiser, eu:
+- implemento o `GET /api/v1/media?fornecedorId=` no frontend/service scaffold;
+- crio esqueleto Cypress com um teste E2E básico (admin create + upload);
+- adiciono exemplos Swagger/JSON no backend para o fluxo de upload.
+
+Para dúvidas ou alteração de contrato (ex.: persistir metadata no presign vs. persistir após PUT), abrir issue com tag `frontend-spec` e marcar `backend` e `frontend`.
 
 Fim do documento

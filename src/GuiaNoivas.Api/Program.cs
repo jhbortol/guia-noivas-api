@@ -130,10 +130,19 @@ using (var scope = app.Services.CreateScope())
     try
     {
         var db = services.GetRequiredService<AppDbContext>();
-        // Apply pending migrations only for relational providers; use EnsureCreated for in-memory/testing
+        // Apply pending migrations only for relational providers; use EnsureCreated for in-memory/testing.
+        // For SQLite (used in tests) migrations generated for SQL Server may be incompatible, so use EnsureCreated.
         if (db.Database.IsRelational())
         {
-            db.Database.Migrate();
+            var provider = db.Database.ProviderName ?? string.Empty;
+            if (provider.Contains("Sqlite", StringComparison.OrdinalIgnoreCase))
+            {
+                db.Database.EnsureCreated();
+            }
+            else
+            {
+                db.Database.Migrate();
+            }
         }
         else
         {

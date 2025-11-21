@@ -18,31 +18,55 @@ public class MediaController : ControllerBase
         _blobService = blobService;
     }
 
-    [HttpPost("presign")]
-    [Authorize]
-    public IActionResult Presign([FromBody] PresignDto dto)
+
+    [HttpPost("upload")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> Upload([FromForm] MediaUploadDto dto)
     {
-        // If Blob service is registered (Storage configured), generate SAS URL.
+        if (dto.File == null || dto.File.Length == 0)
+            return BadRequest(new { message = "Arquivo não enviado." });
+        if (dto.FornecedorId == null)
+            return BadRequest(new { message = "FornecedorId é obrigatório." });
+
+        // Salvar arquivo no storage (exemplo: local ou Azure Blob)
+        string publicUrl;
+        string filename = dto.Filename ?? dto.File.FileName;
         if (_blobService != null)
         {
-            var fileName = dto.Filename ?? Guid.NewGuid().ToString();
-            var safeName = fileName.Replace(" ", "_");
-            var blobName = $"{Guid.NewGuid():N}_{safeName}";
-            try
+            var blobName = $"media/{DateTime.UtcNow:yyyy/MM}/{Guid.NewGuid():N}_{filename}";
+            using var stream = dto.File.OpenReadStream();
+            publicUrl = await _blobService.UploadAsync(blobName, stream, dto.ContentType ?? dto.File.ContentType);
+        }
+        else
+        {
+            // fallback: salvar localmente em wwwroot/uploads
+            var uploads = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads");
+            Directory.CreateDirectory(uploads);
+            var filePath = Path.Combine(uploads, filename);
+            using (var stream = new FileStream(filePath, FileMode.Create))
             {
-                var result = _blobService.GetUploadSasUriAsync(blobName, TimeSpan.FromMinutes(15), dto.ContentType).GetAwaiter().GetResult();
-                return Ok(new { uploadUrl = result.Url.ToString(), blobName = result.BlobName });
+                await dto.File.CopyToAsync(stream);
             }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new { error = "Failed to generate SAS URL.", details = ex.Message });
-            }
+            publicUrl = $"/uploads/{filename}";
         }
 
-        // fallback: return a local upload URL (client should POST multipart to /uploads)
-        var fallbackFile = dto.Filename ?? Guid.NewGuid().ToString();
-        var publicUrl = $"/uploads/{fallbackFile}";
-        return Ok(new { uploadUrl = publicUrl, publicUrl, blobName = fallbackFile });
+        // Persistir metadados
+        var media = new GuiaNoivas.Api.Models.Media
+        {
+            Id = Guid.NewGuid(),
+            FornecedorId = dto.FornecedorId,
+            Url = publicUrl,
+            Filename = filename,
+            ContentType = dto.ContentType ?? dto.File.ContentType,
+            Width = dto.Width,
+            Height = dto.Height,
+            IsPrimary = dto.IsPrimary,
+            CreatedAt = DateTimeOffset.UtcNow
+        };
+        var db = HttpContext.RequestServices.GetRequiredService<GuiaNoivas.Api.Data.AppDbContext>();
+        db.Media.Add(media);
+        await db.SaveChangesAsync();
+        return CreatedAtAction(nameof(GetById), new { id = media.Id }, media);
     }
 
     [HttpPost]
@@ -127,4 +151,13 @@ public class MediaController : ControllerBase
 
 public record CreateMediaDto(Guid? FornecedorId, string? Url, string? Filename, string? ContentType, int? Width, int? Height, bool IsPrimary);
 
-public record PresignDto(string Filename, string ContentType, Guid? FornecedorId);
+public class MediaUploadDto
+{
+    public Guid? FornecedorId { get; set; }
+    public string? Filename { get; set; }
+    public string? ContentType { get; set; }
+    public int? Width { get; set; }
+    public int? Height { get; set; }
+    public bool IsPrimary { get; set; }
+    public IFormFile? File { get; set; }
+}

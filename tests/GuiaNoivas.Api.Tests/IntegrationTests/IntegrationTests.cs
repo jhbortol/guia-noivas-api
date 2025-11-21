@@ -108,17 +108,24 @@ public class IntegrationTests : IClassFixture<WebApplicationFactory<Program>>
         var createResp = await client.PostAsync("/api/v1/admin/fornecedores", new StringContent(fornecedorBody, Encoding.UTF8, "application/json"));
         Assert.True(createResp.IsSuccessStatusCode, await createResp.Content.ReadAsStringAsync());
 
-        // Presign media
-        var presignBody = JsonSerializer.Serialize(new { filename = "foto.jpg", contentType = "image/jpeg" });
-        var presignResp = await client.PostAsync("/api/v1/media/presign", new StringContent(presignBody, Encoding.UTF8, "application/json"));
-        presignResp.EnsureSuccessStatusCode();
-        var presignJson = await presignResp.Content.ReadAsStringAsync();
-        using var presignDoc = JsonDocument.Parse(presignJson);
-        var uploadUrl = presignDoc.RootElement.GetProperty("uploadUrl").GetString();
-        var blobName = presignDoc.RootElement.GetProperty("blobName").GetString();
+        // Upload media via backend (multipart/form-data)
+        var createJson = await createResp.Content.ReadAsStringAsync();
+        using var createDoc = JsonDocument.Parse(createJson);
+        var fornecedorId = createDoc.RootElement.GetProperty("id").GetGuid();
 
-        Assert.False(string.IsNullOrWhiteSpace(uploadUrl));
-        Assert.False(string.IsNullOrWhiteSpace(blobName));
+        var multipart = new MultipartFormDataContent();
+        var fakeBytes = Encoding.UTF8.GetBytes("fake-image-bytes");
+        var fileContent = new ByteArrayContent(fakeBytes);
+        fileContent.Headers.ContentType = new MediaTypeHeaderValue("image/jpeg");
+        multipart.Add(fileContent, "File", "foto.jpg");
+        multipart.Add(new StringContent(fornecedorId.ToString()), "FornecedorId");
+        multipart.Add(new StringContent("foto.jpg"), "Filename");
+        multipart.Add(new StringContent("image/jpeg"), "ContentType");
+
+        var uploadResp = await client.PostAsync("/api/v1/media/upload", multipart);
+        uploadResp.EnsureSuccessStatusCode();
+        var uploadJson = await uploadResp.Content.ReadAsStringAsync();
+        Assert.False(string.IsNullOrWhiteSpace(uploadJson));
     }
 
     private class FakeBlobService : IBlobService
@@ -127,6 +134,12 @@ public class IntegrationTests : IClassFixture<WebApplicationFactory<Program>>
         {
             var upload = new Uri($"https://fakestorage.local/media/{blobName}");
             return Task.FromResult<(Uri, string)>((upload, blobName));
+        }
+        public Task<string> UploadAsync(string blobName, System.IO.Stream stream, string contentType)
+        {
+            // In tests we don't actually upload; return a fake blob URL
+            var uri = $"https://fakestorage.local/media/{blobName}";
+            return Task.FromResult(uri);
         }
     }
 

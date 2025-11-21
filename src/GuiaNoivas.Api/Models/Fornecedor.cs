@@ -24,6 +24,7 @@ public class Fornecedor
     public bool SeloFornecedor { get; set; }
     public decimal? Rating { get; set; }
     public int Visitas { get; set; }
+    public bool Ativo { get; set; } = true;
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset? UpdatedAt { get; set; }
 

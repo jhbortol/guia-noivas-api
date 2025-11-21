@@ -246,4 +246,4 @@ If you want, I can add a short `samples/` client demonstrating a chunked upload 
 
 
 
- & $env:TEMP\dotnet-install.ps1 -Channel 9.0 -InstallDir $env:USERPROFILE\.dotnet
+

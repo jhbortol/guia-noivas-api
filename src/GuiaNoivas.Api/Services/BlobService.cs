@@ -10,6 +10,7 @@ namespace GuiaNoivas.Api.Services;
 public interface IBlobService
 {
     Task<(Uri Url, string BlobName)> GetUploadSasUriAsync(string blobName, TimeSpan expiry, string? contentType = null);
+    Task<string> UploadAsync(string blobName, Stream stream, string contentType);
 }
 
 public class BlobService : IBlobService
@@ -60,5 +61,14 @@ public class BlobService : IBlobService
         var sasUri = new UriBuilder(blob.Uri) { Query = sas }.Uri;
 
         return (sasUri, blobName);
+    }
+
+    public async Task<string> UploadAsync(string blobName, Stream stream, string contentType)
+    {
+        var container = _client.GetBlobContainerClient(_containerName);
+        await container.CreateIfNotExistsAsync();
+        var blob = container.GetBlobClient(blobName);
+        await blob.UploadAsync(stream, new Azure.Storage.Blobs.Models.BlobHttpHeaders { ContentType = contentType });
+        return blob.Uri.ToString();
     }
 }
