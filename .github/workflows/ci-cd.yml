@@ -25,10 +25,12 @@ jobs:
         run: dotnet test tests/GuiaNoivas.Api.Tests/GuiaNoivas.Api.Tests.csproj -c Release --no-build --verbosity normal
 
       - name: Publish
-        run: dotnet publish src/GuiaNoivas.Api/GuiaNoivas.Api.csproj -c Release --no-build
+        run: |
+          dotnet publish src/GuiaNoivas.Api/GuiaNoivas.Api.csproj -c Release -o ./publish --no-build
 
       - name: Show publish folder (debug)
-        run: ls -la src/GuiaNoivas.Api/bin/Release/net9.0/publish || true
+        run: |
+          echo "Publish output listing:"; ls -la ./publish || true
 
       - name: FTP Deploy
         uses: SamKirkland/FTP-Deploy-Action@v4.3.6
@@ -36,7 +38,7 @@ jobs:
           server: ${{ secrets.FTP_HOST }}
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.ftp_password }}
-          local-dir: src/GuiaNoivas.Api/bin/Release/net9.0/publish/
+          local-dir: ./publish/
           server-dir: ${{ env.FTP_REMOTE_PATH }}
         env:
           FTP_REMOTE_PATH: ${{ secrets.FTP_REMOTE_PATH }}
