@@ -159,10 +159,7 @@ app.UseEndpoints(endpoints =>
 {
     endpoints.MapControllers();
     // Swagger UI endpoint - allow anonymous
-    endpoints.MapGet("/swagger/{**any}", async context =>
-    {
-        context.Response.Redirect("/swagger/index.html");
-    }).AllowAnonymous();
+    // Removed custom redirect to avoid infinite loop. Swagger static files are served by app.UseSwaggerUI().
     // Hangfire dashboard endpoint - allow anonymous
     endpoints.MapHangfireDashboard("/hangfire", new Hangfire.DashboardOptions
     {
