@@ -149,8 +149,22 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
+
 app.UseRouting();
 app.UseAuthentication();
+// Serve static files before authorization so Swagger UI files are accessible
+app.UseStaticFiles();
+// Bypass authorization for Swagger static files
+app.Use(async (context, next) =>
+{
+    var path = context.Request.Path.Value;
+    if (path != null && path.StartsWith("/swagger"))
+    {
+        await next();
+        return;
+    }
+    await next();
+});
 app.UseAuthorization();
 
 app.UseSwagger();
