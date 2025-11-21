@@ -19,4 +19,7 @@ public class Categoria
     public int Order { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset? UpdatedAt { get; set; }
+
+    // Navegação inversa: uma categoria pode ter vários fornecedores
+    public ICollection<Fornecedor> Fornecedores { get; set; } = new List<Fornecedor>();
 }

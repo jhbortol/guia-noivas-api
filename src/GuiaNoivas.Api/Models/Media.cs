@@ -8,6 +8,7 @@ public class Media
     public Guid Id { get; set; }
 
     public Guid? FornecedorId { get; set; }
+    public Fornecedor? Fornecedor { get; set; }
     public string? Url { get; set; }
     public string? Filename { get; set; }
     public string? ContentType { get; set; }

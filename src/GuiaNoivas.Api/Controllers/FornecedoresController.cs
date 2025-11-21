@@ -24,9 +24,29 @@ public class FornecedoresController : ControllerBase
         if (page < 1) page = 1;
         if (pageSize < 1) pageSize = 12;
 
-        var query = _db.Fornecedores.AsNoTracking().OrderByDescending(f => f.Destaque).ThenByDescending(f => f.Rating);
+        var query = _db.Fornecedores
+            .AsNoTracking()
+            .Include(f => f.Categoria)
+            .Include(f => f.Medias)
+            .OrderByDescending(f => f.Destaque)
+            .ThenByDescending(f => f.Rating);
+
         var total = await query.CountAsync();
-        var data = await query.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
+
+        var data = await query.Skip((page - 1) * pageSize).Take(pageSize)
+            .Select(f => new GuiaNoivas.Api.Dtos.FornecedorListDto(
+                f.Id,
+                f.Nome,
+                f.Slug,
+                f.Descricao,
+                f.Cidade,
+                f.Rating,
+                f.Destaque,
+                f.SeloFornecedor,
+                f.Categoria == null ? null : new GuiaNoivas.Api.Dtos.CategoriaDto(f.Categoria.Id, f.Categoria.Nome, f.Categoria.Slug),
+                f.Medias.OrderByDescending(m => m.IsPrimary).ThenByDescending(m => m.CreatedAt).Select(m => new GuiaNoivas.Api.Dtos.MediaDto(m.Id, m.Url, m.Filename, m.ContentType, m.IsPrimary)).FirstOrDefault()
+            ))
+            .ToListAsync();
 
         return Ok(new { data, meta = new { total, page, pageSize } });
     }
@@ -34,7 +54,31 @@ public class FornecedoresController : ControllerBase
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> GetById(Guid id)
     {
-        var item = await _db.Fornecedores.FindAsync(id);
+        var item = await _db.Fornecedores
+            .AsNoTracking()
+            .Include(f => f.Categoria)
+            .Include(f => f.Medias)
+            .Where(f => f.Id == id)
+            .Select(f => new GuiaNoivas.Api.Dtos.FornecedorDetailDto(
+                f.Id,
+                f.Nome,
+                f.Slug,
+                f.Descricao,
+                f.Cidade,
+                f.Telefone,
+                f.Email,
+                f.Website,
+                f.Destaque,
+                f.SeloFornecedor,
+                f.Rating,
+                f.Visitas,
+                f.CreatedAt,
+                f.UpdatedAt,
+                f.Medias.OrderByDescending(m => m.IsPrimary).ThenByDescending(m => m.CreatedAt).Select(m => new GuiaNoivas.Api.Dtos.MediaDto(m.Id, m.Url, m.Filename, m.ContentType, m.IsPrimary)),
+                f.Categoria == null ? null : new GuiaNoivas.Api.Dtos.CategoriaDto(f.Categoria.Id, f.Categoria.Nome, f.Categoria.Slug)
+            ))
+            .FirstOrDefaultAsync();
+
         if (item == null) return NotFound();
         return Ok(item);
     }
@@ -42,7 +86,31 @@ public class FornecedoresController : ControllerBase
     [HttpGet("slug/{slug}")]
     public async Task<IActionResult> GetBySlug(string slug)
     {
-        var item = await _db.Fornecedores.FirstOrDefaultAsync(f => f.Slug == slug);
+        var item = await _db.Fornecedores
+            .AsNoTracking()
+            .Include(f => f.Categoria)
+            .Include(f => f.Medias)
+            .Where(f => f.Slug == slug)
+            .Select(f => new GuiaNoivas.Api.Dtos.FornecedorDetailDto(
+                f.Id,
+                f.Nome,
+                f.Slug,
+                f.Descricao,
+                f.Cidade,
+                f.Telefone,
+                f.Email,
+                f.Website,
+                f.Destaque,
+                f.SeloFornecedor,
+                f.Rating,
+                f.Visitas,
+                f.CreatedAt,
+                f.UpdatedAt,
+                f.Medias.OrderByDescending(m => m.IsPrimary).ThenByDescending(m => m.CreatedAt).Select(m => new GuiaNoivas.Api.Dtos.MediaDto(m.Id, m.Url, m.Filename, m.ContentType, m.IsPrimary)),
+                f.Categoria == null ? null : new GuiaNoivas.Api.Dtos.CategoriaDto(f.Categoria.Id, f.Categoria.Nome, f.Categoria.Slug)
+            ))
+            .FirstOrDefaultAsync();
+
         if (item == null) return NotFound();
         return Ok(item);
     }

@@ -26,4 +26,10 @@ public class Fornecedor
     public int Visitas { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset? UpdatedAt { get; set; }
+
+    // Relações
+    public Guid? CategoriaId { get; set; }
+    public Categoria? Categoria { get; set; }
+
+    public ICollection<Media> Medias { get; set; } = new List<Media>();
 }
