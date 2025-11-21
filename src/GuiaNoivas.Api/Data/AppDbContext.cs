@@ -27,6 +27,7 @@ public class AppDbContext : DbContext
             b.Property(f => f.Visitas).HasDefaultValue(0);
             b.Property(f => f.Destaque).HasDefaultValue(false);
             b.Property(f => f.SeloFornecedor).HasDefaultValue(false);
+            b.Property(f => f.Rating).HasPrecision(5, 2);
         });
 
         modelBuilder.Entity<Categoria>(b =>
