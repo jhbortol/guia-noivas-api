@@ -153,26 +153,21 @@ app.UseRouting();
 app.UseAuthentication();
 app.UseAuthorization();
 
-
-// Swagger - liberar acesso anônimo mesmo em produção
-app.UseWhen(ctx => ctx.Request.Path.StartsWithSegments("/swagger"), appBuilder =>
-{
-    appBuilder.Use((context, next) => next()); // Bypass auth for swagger
-});
-app.UseRouting();
-app.UseAuthentication();
-app.UseAuthorization();
-
-// Swagger endpoints - allow anonymous access
 app.UseSwagger();
-app.UseSwaggerUI();
 
-// Hangfire dashboard - allow anonymous access using custom filter
-app.UseHangfireDashboard("/hangfire", new Hangfire.DashboardOptions
+app.UseEndpoints(endpoints =>
 {
-    Authorization = new[] { new GuiaNoivas.Api.AllowAnonymousAuthorizationFilter() }
+    endpoints.MapControllers();
+    // Swagger UI endpoint - allow anonymous
+    endpoints.MapGet("/swagger/{**any}", async context =>
+    {
+        context.Response.Redirect("/swagger/index.html");
+    }).AllowAnonymous();
+    // Hangfire dashboard endpoint - allow anonymous
+    endpoints.MapHangfireDashboard("/hangfire", new Hangfire.DashboardOptions
+    {
+        Authorization = new[] { new GuiaNoivas.Api.AllowAnonymousAuthorizationFilter() }
+    }).AllowAnonymous();
 });
-
-app.MapControllers();
 
 app.Run();
