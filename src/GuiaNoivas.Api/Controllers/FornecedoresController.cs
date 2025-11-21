@@ -18,6 +18,60 @@ public class FornecedoresController : ControllerBase
         _db = db;
     }
 
+    [HttpPost]
+    public async Task<IActionResult> Create([FromBody] GuiaNoivas.Api.Dtos.FornecedorCreateDto dto)
+    {
+        var exists = await _db.Fornecedores.AnyAsync(f => f.Slug == dto.Slug);
+        if (exists) return Conflict(new { message = "Slug already in use" });
+
+        var f = new Fornecedor
+        {
+            Id = Guid.NewGuid(),
+            Nome = dto.Nome,
+            Slug = dto.Slug,
+            Descricao = dto.Descricao,
+            Cidade = dto.Cidade,
+            Telefone = dto.Telefone,
+            Email = dto.Email,
+            Website = dto.Website,
+            Destaque = dto.Destaque,
+            SeloFornecedor = dto.SeloFornecedor,
+            Rating = dto.Rating,
+            CategoriaId = dto.CategoriaId,
+            CreatedAt = DateTimeOffset.UtcNow
+        };
+
+        _db.Fornecedores.Add(f);
+        await _db.SaveChangesAsync();
+
+        return CreatedAtAction(nameof(GetById), new { id = f.Id }, new { f.Id });
+    }
+
+    [HttpPut("{id:guid}")]
+    public async Task<IActionResult> Update(Guid id, [FromBody] GuiaNoivas.Api.Dtos.FornecedorUpdateDto dto)
+    {
+        var f = await _db.Fornecedores.FindAsync(id);
+        if (f == null) return NotFound();
+
+        f.Nome = dto.Nome;
+        f.Slug = dto.Slug;
+        f.Descricao = dto.Descricao;
+        f.Cidade = dto.Cidade;
+        f.Telefone = dto.Telefone;
+        f.Email = dto.Email;
+        f.Website = dto.Website;
+        f.Destaque = dto.Destaque;
+        f.SeloFornecedor = dto.SeloFornecedor;
+        f.Rating = dto.Rating;
+        f.CategoriaId = dto.CategoriaId;
+        f.UpdatedAt = DateTimeOffset.UtcNow;
+
+        _db.Fornecedores.Update(f);
+        await _db.SaveChangesAsync();
+
+        return NoContent();
+    }
+
     [HttpGet]
     public async Task<IActionResult> Get([FromQuery] int page = 1, [FromQuery] int pageSize = 12)
     {

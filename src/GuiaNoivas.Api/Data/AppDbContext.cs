@@ -33,6 +33,28 @@ public class AppDbContext : DbContext
             b.Property(f => f.Rating).HasPrecision(5, 2);
         });
 
+        // Configure relationships and delete behaviors explicitly
+        modelBuilder.Entity<Fornecedor>(b =>
+        {
+            b.HasOne(f => f.Categoria)
+             .WithMany(c => c.Fornecedores)
+             .HasForeignKey(f => f.CategoriaId)
+             .OnDelete(DeleteBehavior.SetNull);
+
+            b.Navigation(f => f.Categoria);
+            b.Navigation(f => f.Medias);
+        });
+
+        modelBuilder.Entity<Media>(b =>
+        {
+            b.HasOne(m => m.Fornecedor)
+             .WithMany(f => f.Medias)
+             .HasForeignKey(m => m.FornecedorId)
+             .OnDelete(DeleteBehavior.Cascade);
+
+            b.Navigation(m => m.Fornecedor);
+        });
+
         modelBuilder.Entity<Categoria>(b =>
         {
             b.HasIndex(c => c.Slug).IsUnique();
@@ -43,6 +65,20 @@ public class AppDbContext : DbContext
         {
             b.Property(m => m.CreatedAt).HasDefaultValueSql("SYSUTCDATETIME()");
         });
+
+        	// Configure relationships and delete behaviors explicitly
+        	modelBuilder.Entity<Fornecedor>(b =>
+        	{
+        	    b.HasOne(f => f.Categoria)
+        	     .WithMany(c => c.Fornecedores)
+        	     .HasForeignKey(f => f.CategoriaId)
+        	     .OnDelete(DeleteBehavior.SetNull);
+
+        	    b.HasMany(f => f.Medias)
+        	     .WithOne(m => m.Fornecedor)
+        	     .HasForeignKey(m => m.FornecedorId)
+        	     .OnDelete(DeleteBehavior.Cascade);
+        	});
 
         modelBuilder.Entity<Usuario>(b =>
         {
