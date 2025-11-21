@@ -153,10 +153,20 @@ app.UseRouting();
 app.UseAuthentication();
 app.UseAuthorization();
 
+
+// Swagger - liberar acesso anônimo mesmo em produção
+app.UseWhen(ctx => ctx.Request.Path.StartsWithSegments("/swagger"), appBuilder =>
+{
+    appBuilder.Use((context, next) => next()); // Bypass auth for swagger
+});
 app.UseSwagger();
 app.UseSwaggerUI();
 
-// Hangfire dashboard (secured)
+// Hangfire dashboard - liberar acesso anônimo mesmo em produção
+app.UseWhen(ctx => ctx.Request.Path.StartsWithSegments("/hangfire"), appBuilder =>
+{
+    appBuilder.Use((context, next) => next()); // Bypass auth for hangfire
+});
 app.UseHangfireDashboard("/hangfire");
 
 app.MapControllers();
