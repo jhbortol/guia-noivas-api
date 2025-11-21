@@ -157,7 +157,11 @@ app.UseStaticFiles();
 
 // Map /swagger to a branch that does not run the global authorization middleware.
 // This ensures Swagger UI static files are served without the fallback policy blocking them.
-app.MapWhen(ctx => ctx.Request.Path.StartsWithSegments("/swagger"), branch =>
+app.MapWhen(ctx =>
+{
+    var full = (ctx.Request.PathBase + ctx.Request.Path).Value ?? string.Empty;
+    return full.StartsWith("/swagger", StringComparison.OrdinalIgnoreCase);
+}, branch =>
 {
     branch.UseStaticFiles();
     branch.UseSwagger();
