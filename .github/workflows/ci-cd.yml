@@ -1,9 +1,6 @@
-name: CI/CD - Build, Test, Publish & FTP Deploy
+name: 🚀 Deploy website on push
 
-on:
-  push:
-    branches: [ main ]
-  workflow_dispatch:
+on: push
 
 jobs:
   build-and-deploy:
@@ -34,11 +31,11 @@ jobs:
         run: ls -la src/GuiaNoivas.Api/bin/Release/net9.0/publish || true
 
       - name: FTP Deploy
-        uses: SamKirkland/FTP-Deploy-Action@v4
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.6
         with:
           server: ${{ secrets.FTP_HOST }}
           username: ${{ secrets.FTP_USERNAME }}
-          password: ${{ secrets.FTP_PASSWORD }}
+          password: ${{ secrets.ftp_password }}
           local-dir: src/GuiaNoivas.Api/bin/Release/net9.0/publish
           server-dir: ${{ env.FTP_REMOTE_PATH }}
         env:

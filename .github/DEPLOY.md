@@ -16,6 +16,8 @@ Add the following repository secrets (Settings → Secrets & variables → Actio
 - `FTP_PASSWORD` - FTP password (please add the value — do NOT commit it)
 - `FTP_REMOTE_PATH` - remote target folder on the FTP server (e.g. `/www.guia-noivas.somee.com`).
 
+Note: the workflow expects the password secret to be named `ftp_password` (lowercase) in the Actions secrets. To support both naming conventions, you can set both `FTP_PASSWORD` and `ftp_password` to the same value — the workflow uses `ftp_password`.
+
 Notes & usage
 
 - The workflow triggers on push to `main` and can also be started manually from the Actions tab.
