@@ -1,32 +1,6 @@
-using System;
-using Microsoft.EntityFrameworkCore.Migrations;
+// This file was a manually-added migration. EF generated its own migration
+// with the same class name; to avoid duplicate type/method definitions it
+// has been neutralized. The canonical EF migration files are the
+// timestamped ones (e.g. 20251121234805_AddFornecedorAtivo.cs).
 
-#nullable disable
-
-namespace GuiaNoivas.Api.Data.Migrations
-{
-    public partial class AddFornecedorAtivo : Migration
-    {
-        protected override void Up(MigrationBuilder migrationBuilder)
-        {
-            // Add column for SQL Server and other providers
-            migrationBuilder.AddColumn<bool>(
-                name: "Ativo",
-                table: "Fornecedores",
-                type: "bit",
-                nullable: false,
-                defaultValue: true);
-
-            // For SQLite we need to ensure compatibility: AddColumn above works for SQLite too
-            // but older SQLite providers may require table rebuilds. This migration uses AddColumn
-            // which EF will translate appropriately.
-        }
-
-        protected override void Down(MigrationBuilder migrationBuilder)
-        {
-            migrationBuilder.DropColumn(
-                name: "Ativo",
-                table: "Fornecedores");
-        }
-    }
-}
+// Intentionally left blank to avoid duplicate Migration class definitions.
