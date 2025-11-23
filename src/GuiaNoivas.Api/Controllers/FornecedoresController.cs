@@ -376,6 +376,53 @@ public class FornecedoresController : ControllerBase
         return Ok(itemBySlug);
     }
 
+    /// <summary>
+    /// Search fornecedores by name (contains) with pagination.
+    /// </summary>
+    [HttpGet("search")]
+    [AllowAnonymous]
+    public async Task<IActionResult> Search([FromQuery] string nome, [FromQuery] int page = 1, [FromQuery] int pageSize = 12)
+    {
+        if (string.IsNullOrWhiteSpace(nome)) return BadRequest(new { message = "Nome is required" });
+
+        IQueryable<Fornecedor> baseQuery = _db.Fornecedores
+            .AsNoTracking()
+            .Include(f => f.Categoria)
+            .Include(f => f.Medias)
+            .Where(f => EF.Functions.Like(f.Nome, $"%{nome}%"));
+
+        var total = await baseQuery.CountAsync();
+
+        IQueryable<Fornecedor> orderedQuery;
+        if (_db.Database.ProviderName != null && _db.Database.ProviderName.Contains("Sqlite", StringComparison.OrdinalIgnoreCase))
+        {
+            orderedQuery = baseQuery.OrderByDescending(f => f.Destaque);
+        }
+        else
+        {
+            orderedQuery = baseQuery.OrderByDescending(f => f.Destaque).ThenByDescending(f => f.Rating);
+        }
+
+        var data = await orderedQuery.Skip((page - 1) * pageSize).Take(pageSize)
+            .Select(f => new GuiaNoivas.Api.Dtos.FornecedorListDto(
+                f.Id,
+                f.Nome,
+                f.Slug,
+                f.Descricao,
+                f.Cidade,
+                f.Rating,
+                f.Destaque,
+                f.SeloFornecedor,
+                f.Ativo,
+                f.Categoria == null ? null : new GuiaNoivas.Api.Dtos.CategoriaDto(f.Categoria.Id, f.Categoria.Nome, f.Categoria.Slug),
+                f.Medias.OrderByDescending(m => m.IsPrimary).ThenByDescending(m => m.CreatedAt).Select(m => new GuiaNoivas.Api.Dtos.MediaDto(m.Id, m.Url, m.Filename, m.ContentType, m.IsPrimary)).FirstOrDefault(),
+                f.Medias.OrderByDescending(m => m.IsPrimary).ThenByDescending(m => m.CreatedAt).Select(m => new GuiaNoivas.Api.Dtos.MediaDto(m.Id, m.Url, m.Filename, m.ContentType, m.IsPrimary))
+            ))
+            .ToListAsync();
+
+        return Ok(new { data, meta = new { total, page, pageSize } });
+    }
+
     [HttpPost("{id:guid}/visit")]
     public async Task<IActionResult> Visit(Guid id)
     {
