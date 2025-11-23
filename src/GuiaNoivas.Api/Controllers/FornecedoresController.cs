@@ -238,7 +238,8 @@ public class FornecedoresController : ControllerBase
                     f.SeloFornecedor,
                     f.Ativo,
                     f.Categoria == null ? null : new GuiaNoivas.Api.Dtos.CategoriaDto(f.Categoria.Id, f.Categoria.Nome, f.Categoria.Slug),
-                    f.Medias.OrderByDescending(m => m.IsPrimary).ThenByDescending(m => m.CreatedAt).Select(m => new GuiaNoivas.Api.Dtos.MediaDto(m.Id, m.Url, m.Filename, m.ContentType, m.IsPrimary)).FirstOrDefault()
+                    f.Medias.OrderByDescending(m => m.IsPrimary).ThenByDescending(m => m.CreatedAt).Select(m => new GuiaNoivas.Api.Dtos.MediaDto(m.Id, m.Url, m.Filename, m.ContentType, m.IsPrimary)).FirstOrDefault(),
+                    f.Medias.OrderByDescending(m => m.IsPrimary).ThenByDescending(m => m.CreatedAt).Select(m => new GuiaNoivas.Api.Dtos.MediaDto(m.Id, m.Url, m.Filename, m.ContentType, m.IsPrimary))
                 ))
                 .ToListAsync();
         }
@@ -273,10 +274,11 @@ public class FornecedoresController : ControllerBase
                     f.Visitas,
                     f.CreatedAt,
                     f.UpdatedAt,
-                    f.Medias.OrderByDescending(m => m.IsPrimary).Select(m => new GuiaNoivas.Api.Dtos.MediaDto(m.Id, m.Url, m.Filename, m.ContentType, m.IsPrimary)),
+                    f.Medias.OrderByDescending(m => m.IsPrimary).ThenByDescending(m => m.CreatedAt)
+                        .Select(m => new GuiaNoivas.Api.Dtos.MediaDto(m.Id, m.Url, m.Filename, m.ContentType, m.IsPrimary)),
                     f.Categoria == null ? null : new GuiaNoivas.Api.Dtos.CategoriaDto(f.Categoria.Id, f.Categoria.Nome, f.Categoria.Slug)
-                    f.Medias.OrderByDescending(m => m.IsPrimary).ThenByDescending(m => m.CreatedAt).Select(m => new GuiaNoivas.Api.Dtos.MediaDto(m.Id, m.Url, m.Filename, m.ContentType, m.IsPrimary)),
-                .FirstOrDefaultAsync();
+                    ))
+                    .FirstOrDefaultAsync();
         }
         else
         {
