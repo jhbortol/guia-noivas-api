@@ -57,6 +57,7 @@ public class MediaController : ControllerBase
         {
             Id = Guid.NewGuid(),
             FornecedorId = dto.FornecedorId,
+            CategoriaId = dto.CategoriaId,
             Url = publicUrl,
             Filename = filename,
             ContentType = dto.ContentType ?? dto.File.ContentType,
@@ -80,6 +81,7 @@ public class MediaController : ControllerBase
         {
             Id = Guid.NewGuid(),
             FornecedorId = dto.FornecedorId,
+            CategoriaId = dto.CategoriaId,
             Url = dto.Url,
             Filename = dto.Filename,
             ContentType = dto.ContentType,
@@ -151,7 +153,7 @@ public class MediaController : ControllerBase
     }
 }
 
-public record CreateMediaDto(Guid? FornecedorId, string? Url, string? Filename, string? ContentType, int? Width, int? Height, bool IsPrimary);
+public record CreateMediaDto(Guid? FornecedorId, Guid? CategoriaId, string? Url, string? Filename, string? ContentType, int? Width, int? Height, bool IsPrimary);
 
 public class MediaUploadDto
 {
@@ -162,4 +164,5 @@ public class MediaUploadDto
     public int? Height { get; set; }
     public bool IsPrimary { get; set; }
     public IFormFile? File { get; set; }
+    public Guid? CategoriaId { get; set; }
 }

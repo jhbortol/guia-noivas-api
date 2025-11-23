@@ -195,6 +195,91 @@ public class IntegrationTests : IClassFixture<WebApplicationFactory<Program>>
         }
     }
 
+    [Fact]
+    public async Task Category_Media_CRUD_Flow()
+    {
+        var client = _factory.CreateClient();
+
+        // 1) Create category
+        var categoriaBody = JsonSerializer.Serialize(new
+        {
+            nome = "Cat With Media",
+            slug = "cat-with-media",
+            descricao = "Categoria para teste",
+            order = 1
+        });
+        var createCatResp = await client.PostAsync("/api/v1/categorias", new StringContent(categoriaBody, Encoding.UTF8, "application/json"));
+        createCatResp.EnsureSuccessStatusCode();
+        var createCatJson = await createCatResp.Content.ReadAsStringAsync();
+        using var createCatDoc = JsonDocument.Parse(createCatJson);
+        var categoriaId = createCatDoc.RootElement.GetProperty("id").GetGuid();
+
+        // 2) Upload media and associate to category via CategoriaId
+        var multipart = new MultipartFormDataContent();
+        var fakeBytes = Encoding.UTF8.GetBytes("fake-image-bytes");
+        var fileContent = new ByteArrayContent(fakeBytes);
+        fileContent.Headers.ContentType = new MediaTypeHeaderValue("image/png");
+        multipart.Add(fileContent, "File", "cat.png");
+        multipart.Add(new StringContent(categoriaId.ToString()), "CategoriaId");
+        multipart.Add(new StringContent("cat.png"), "Filename");
+        multipart.Add(new StringContent("image/png"), "ContentType");
+
+        var uploadResp = await client.PostAsync("/api/v1/media/upload", multipart);
+        uploadResp.EnsureSuccessStatusCode();
+        var uploadJson = await uploadResp.Content.ReadAsStringAsync();
+        using var uploadDoc = JsonDocument.Parse(uploadJson);
+        var mediaId = uploadDoc.RootElement.GetProperty("id").GetGuid();
+
+        // 3) Get category and verify image id/url
+        var getCatResp = await client.GetAsync($"/api/v1/categorias/{categoriaId}");
+        getCatResp.EnsureSuccessStatusCode();
+        var getCatJson = await getCatResp.Content.ReadAsStringAsync();
+        using var getCatDoc = JsonDocument.Parse(getCatJson);
+        var imageId = getCatDoc.RootElement.GetProperty("imageId").GetGuid();
+        Assert.Equal(mediaId, imageId);
+
+        // 4) Upload another media and update category to point to it
+        var multipart2 = new MultipartFormDataContent();
+        var fakeBytes2 = Encoding.UTF8.GetBytes("fake-image-bytes-2");
+        var fileContent2 = new ByteArrayContent(fakeBytes2);
+        fileContent2.Headers.ContentType = new MediaTypeHeaderValue("image/png");
+        multipart2.Add(fileContent2, "File", "cat2.png");
+        multipart2.Add(new StringContent(categoriaId.ToString()), "CategoriaId");
+        multipart2.Add(new StringContent("cat2.png"), "Filename");
+        multipart2.Add(new StringContent("image/png"), "ContentType");
+
+        var uploadResp2 = await client.PostAsync("/api/v1/media/upload", multipart2);
+        uploadResp2.EnsureSuccessStatusCode();
+        var uploadJson2 = await uploadResp2.Content.ReadAsStringAsync();
+        using var uploadDoc2 = JsonDocument.Parse(uploadJson2);
+        var mediaId2 = uploadDoc2.RootElement.GetProperty("id").GetGuid();
+
+        // Update category to use the new media (use MediaId in update DTO)
+        var updateBody = JsonSerializer.Serialize(new { nome = "Cat With Media", slug = "cat-with-media", descricao = "Categoria para teste", order = 1, mediaId = mediaId2 });
+        var putResp = await client.PutAsync($"/api/v1/categorias/{categoriaId}", new StringContent(updateBody, Encoding.UTF8, "application/json"));
+        Assert.Equal(System.Net.HttpStatusCode.NoContent, putResp.StatusCode);
+
+        var getCatResp2 = await client.GetAsync($"/api/v1/categorias/{categoriaId}");
+        getCatResp2.EnsureSuccessStatusCode();
+        var getCatJson2 = await getCatResp2.Content.ReadAsStringAsync();
+        using var getCatDoc2 = JsonDocument.Parse(getCatJson2);
+        var imageId2 = getCatDoc2.RootElement.GetProperty("imageId").GetGuid();
+        Assert.Equal(mediaId2, imageId2);
+
+        // 5) Delete category and ensure media.CategoriaId becomes null
+        var delResp = await client.DeleteAsync($"/api/v1/categorias/{categoriaId}");
+        Assert.Equal(System.Net.HttpStatusCode.NoContent, delResp.StatusCode);
+
+        // Verify media now has null CategoriaId in the database
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var media = await db.Media.FindAsync(mediaId2);
+            Assert.NotNull(media);
+            Assert.Null(media.CategoriaId);
+        }
+    }
+
     private class FakeBlobService : IBlobService
     {
         public Task<(Uri Url, string BlobName)> GetUploadSasUriAsync(string blobName, TimeSpan expiry, string? contentType = null)

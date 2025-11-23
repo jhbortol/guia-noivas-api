@@ -138,6 +138,17 @@ public class CategoriasController : ControllerBase
         var c = await _db.Categorias.FindAsync(id);
         if (c == null) return NotFound();
 
+        // Before deleting the category, unset CategoriaId on any Media that references it.
+        var medias = await _db.Media.Where(m => m.CategoriaId == id).ToListAsync();
+        if (medias.Any())
+        {
+            foreach (var m in medias)
+            {
+                m.CategoriaId = null;
+                _db.Media.Update(m);
+            }
+        }
+
         _db.Categorias.Remove(c);
         await _db.SaveChangesAsync();
         return NoContent();
