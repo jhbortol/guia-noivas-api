@@ -22,4 +22,7 @@ public class Categoria
 
     // Navegação inversa: uma categoria pode ter vários fornecedores
     public ICollection<Fornecedor> Fornecedores { get; set; } = new List<Fornecedor>();
+
+    // Uma categoria possui no máximo uma imagem
+    public Media? Media { get; set; }
 }

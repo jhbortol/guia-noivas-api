@@ -66,6 +66,17 @@ public class AppDbContext : DbContext
             b.Property(m => m.CreatedAt).HasDefaultValueSql("SYSUTCDATETIME()");
         });
 
+        // Relacionamento entre Categoria e Media (uma categoria possui no máximo uma mídia)
+        modelBuilder.Entity<Media>(b =>
+        {
+            b.HasOne(m => m.Categoria)
+             .WithOne(c => c.Media)
+             .HasForeignKey<Media>(m => m.CategoriaId)
+             .OnDelete(DeleteBehavior.SetNull);
+
+            b.Navigation(m => m.Categoria);
+        });
+
         	// Configure relationships and delete behaviors explicitly
         	modelBuilder.Entity<Fornecedor>(b =>
         	{

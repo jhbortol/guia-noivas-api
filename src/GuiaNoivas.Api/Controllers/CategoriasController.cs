@@ -26,10 +26,13 @@ public class CategoriasController : ControllerBase
         if (page < 1) page = 1;
         if (pageSize < 1) pageSize = 50;
 
-        var query = _db.Categorias.AsNoTracking().OrderBy(c => c.Order).ThenBy(c => c.Nome);
+        var query = _db.Categorias
+            .Include(c => c.Media)
+            .AsNoTracking()
+            .OrderBy(c => c.Order).ThenBy(c => c.Nome);
         var total = await query.CountAsync();
         var items = await query.Skip((page - 1) * pageSize).Take(pageSize)
-            .Select(c => new CategoriaListDto(c.Id, c.Nome, c.Slug, c.Descricao))
+            .Select(c => new CategoriaListDto(c.Id, c.Nome, c.Slug, c.Descricao, c.Media != null ? c.Media.Id : (Guid?)null, c.Media != null ? c.Media.Url : null))
             .ToListAsync();
 
         return Ok(new { data = items, meta = new { total, page, pageSize } });
@@ -39,9 +42,9 @@ public class CategoriasController : ControllerBase
     [AllowAnonymous]
     public async Task<IActionResult> GetById(Guid id)
     {
-        var c = await _db.Categorias.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id);
+        var c = await _db.Categorias.Include(ca => ca.Media).AsNoTracking().FirstOrDefaultAsync(x => x.Id == id);
         if (c == null) return NotFound();
-        return Ok(new CategoriaDetailDto(c.Id, c.Nome, c.Slug, c.Descricao, c.Order, c.CreatedAt, c.UpdatedAt));
+        return Ok(new CategoriaDetailDto(c.Id, c.Nome, c.Slug, c.Descricao, c.Order, c.CreatedAt, c.UpdatedAt, c.Media != null ? c.Media.Id : (Guid?)null, c.Media != null ? c.Media.Url : null));
     }
 
     [HttpPost]
@@ -66,6 +69,17 @@ public class CategoriasController : ControllerBase
         _db.Categorias.Add(c);
         await _db.SaveChangesAsync();
 
+        // Se foi fornecido MediaId, vincular essa mídia à categoria recém-criada
+        if (dto is not null && dto.MediaId is not null)
+        {
+            var media = await _db.Media.FindAsync(dto.MediaId.Value);
+            if (media != null)
+            {
+                media.CategoriaId = c.Id;
+                _db.Media.Update(media);
+                await _db.SaveChangesAsync();
+            }
+        }
         return CreatedAtAction(nameof(GetById), new { id = c.Id }, new { c.Id });
     }
 
@@ -89,6 +103,30 @@ public class CategoriasController : ControllerBase
 
         _db.Categorias.Update(c);
         await _db.SaveChangesAsync();
+
+        // Atualizar associação de mídia: remover associação antiga e linkar nova (se fornecida)
+        if (dto is not null)
+        {
+            // remover mídia antiga vinculada a essa categoria (se diferente da nova)
+            var currentMedia = await _db.Media.FirstOrDefaultAsync(m => m.CategoriaId == id);
+            if (currentMedia != null && currentMedia.Id != dto.MediaId)
+            {
+                currentMedia.CategoriaId = null;
+                _db.Media.Update(currentMedia);
+            }
+
+            if (dto.MediaId is not null)
+            {
+                var newMedia = await _db.Media.FindAsync(dto.MediaId.Value);
+                if (newMedia != null)
+                {
+                    newMedia.CategoriaId = id;
+                    _db.Media.Update(newMedia);
+                }
+            }
+
+            await _db.SaveChangesAsync();
+        }
 
         return NoContent();
     }

@@ -19,7 +19,34 @@ public class FornecedoresController : ControllerBase
     [AllowAnonymous]
     public async Task<IActionResult> GetAll()
     {
-        var fornecedores = await _db.Fornecedores
+        var isSqlite = _db.Database.ProviderName != null && _db.Database.ProviderName.Contains("Sqlite", StringComparison.OrdinalIgnoreCase);
+
+        if (isSqlite)
+        {
+            var fornecedores = await _db.Fornecedores
+                .AsNoTracking()
+                .Include(f => f.Categoria)
+                .Include(f => f.Medias)
+                .OrderByDescending(f => f.Destaque)
+                .Select(f => new GuiaNoivas.Api.Dtos.FornecedorListDto(
+                    f.Id,
+                    f.Nome,
+                    f.Slug,
+                    f.Descricao,
+                    f.Cidade,
+                    f.Rating,
+                    f.Destaque,
+                    f.SeloFornecedor,
+                    f.Ativo,
+                    f.Categoria == null ? null : new GuiaNoivas.Api.Dtos.CategoriaDto(f.Categoria.Id, f.Categoria.Nome, f.Categoria.Slug),
+                    f.Medias.OrderByDescending(m => m.IsPrimary).Select(m => new GuiaNoivas.Api.Dtos.MediaDto(m.Id, m.Url, m.Filename, m.ContentType, m.IsPrimary)).FirstOrDefault(),
+                    f.Medias.OrderByDescending(m => m.IsPrimary).Select(m => new GuiaNoivas.Api.Dtos.MediaDto(m.Id, m.Url, m.Filename, m.ContentType, m.IsPrimary))
+                ))
+                .ToListAsync();
+            return Ok(fornecedores);
+        }
+
+        var fornecedoresNonSqlite = await _db.Fornecedores
             .AsNoTracking()
             .Include(f => f.Categoria)
             .Include(f => f.Medias)
@@ -39,7 +66,7 @@ public class FornecedoresController : ControllerBase
                 f.Medias.OrderByDescending(m => m.IsPrimary).ThenByDescending(m => m.CreatedAt).Select(m => new GuiaNoivas.Api.Dtos.MediaDto(m.Id, m.Url, m.Filename, m.ContentType, m.IsPrimary))
             ))
             .ToListAsync();
-        return Ok(fornecedores);
+        return Ok(fornecedoresNonSqlite);
     }
 
     /// <summary>
@@ -49,7 +76,35 @@ public class FornecedoresController : ControllerBase
     [AllowAnonymous]
     public async Task<IActionResult> GetAtivos()
     {
-        var fornecedores = await _db.Fornecedores
+        var isSqlite = _db.Database.ProviderName != null && _db.Database.ProviderName.Contains("Sqlite", StringComparison.OrdinalIgnoreCase);
+
+        if (isSqlite)
+        {
+            var fornecedores = await _db.Fornecedores
+                .AsNoTracking()
+                .Include(f => f.Categoria)
+                .Include(f => f.Medias)
+                .Where(f => f.Ativo)
+                .OrderByDescending(f => f.Destaque)
+                .Select(f => new GuiaNoivas.Api.Dtos.FornecedorListDto(
+                    f.Id,
+                    f.Nome,
+                    f.Slug,
+                    f.Descricao,
+                    f.Cidade,
+                    f.Rating,
+                    f.Destaque,
+                    f.SeloFornecedor,
+                    f.Ativo,
+                    f.Categoria == null ? null : new GuiaNoivas.Api.Dtos.CategoriaDto(f.Categoria.Id, f.Categoria.Nome, f.Categoria.Slug),
+                    f.Medias.OrderByDescending(m => m.IsPrimary).Select(m => new GuiaNoivas.Api.Dtos.MediaDto(m.Id, m.Url, m.Filename, m.ContentType, m.IsPrimary)).FirstOrDefault(),
+                    f.Medias.OrderByDescending(m => m.IsPrimary).Select(m => new GuiaNoivas.Api.Dtos.MediaDto(m.Id, m.Url, m.Filename, m.ContentType, m.IsPrimary))
+                ))
+                .ToListAsync();
+            return Ok(fornecedores);
+        }
+
+        var fornecedoresNonSqlite = await _db.Fornecedores
             .AsNoTracking()
             .Include(f => f.Categoria)
             .Include(f => f.Medias)
@@ -70,7 +125,7 @@ public class FornecedoresController : ControllerBase
                 f.Medias.OrderByDescending(m => m.IsPrimary).ThenByDescending(m => m.CreatedAt).Select(m => new GuiaNoivas.Api.Dtos.MediaDto(m.Id, m.Url, m.Filename, m.ContentType, m.IsPrimary))
             ))
             .ToListAsync();
-        return Ok(fornecedores);
+        return Ok(fornecedoresNonSqlite);
     }
     
     private readonly AppDbContext _db;
@@ -205,7 +260,9 @@ public class FornecedoresController : ControllerBase
         }
 
         List<GuiaNoivas.Api.Dtos.FornecedorListDto> data;
-        if (_db.Database.ProviderName != null && _db.Database.ProviderName.Contains("Sqlite", StringComparison.OrdinalIgnoreCase))
+        var isSqlite = _db.Database.ProviderName != null && _db.Database.ProviderName.Contains("Sqlite", StringComparison.OrdinalIgnoreCase);
+
+        if (isSqlite)
         {
             data = await orderedQuery.Skip((page - 1) * pageSize).Take(pageSize)
                 .Select(f => new GuiaNoivas.Api.Dtos.FornecedorListDto(
@@ -219,8 +276,8 @@ public class FornecedoresController : ControllerBase
                     f.SeloFornecedor,
                     f.Ativo,
                     f.Categoria == null ? null : new GuiaNoivas.Api.Dtos.CategoriaDto(f.Categoria.Id, f.Categoria.Nome, f.Categoria.Slug),
-                    f.Medias.OrderByDescending(m => m.IsPrimary).ThenByDescending(m => m.CreatedAt).Select(m => new GuiaNoivas.Api.Dtos.MediaDto(m.Id, m.Url, m.Filename, m.ContentType, m.IsPrimary)).FirstOrDefault(),
-                    f.Medias.OrderByDescending(m => m.IsPrimary).ThenByDescending(m => m.CreatedAt).Select(m => new GuiaNoivas.Api.Dtos.MediaDto(m.Id, m.Url, m.Filename, m.ContentType, m.IsPrimary))
+                    f.Medias.OrderByDescending(m => m.IsPrimary).Select(m => new GuiaNoivas.Api.Dtos.MediaDto(m.Id, m.Url, m.Filename, m.ContentType, m.IsPrimary)).FirstOrDefault(),
+                    f.Medias.OrderByDescending(m => m.IsPrimary).Select(m => new GuiaNoivas.Api.Dtos.MediaDto(m.Id, m.Url, m.Filename, m.ContentType, m.IsPrimary))
                 ))
                 .ToListAsync();
         }
@@ -274,7 +331,7 @@ public class FornecedoresController : ControllerBase
                     f.Visitas,
                     f.CreatedAt,
                     f.UpdatedAt,
-                    f.Medias.OrderByDescending(m => m.IsPrimary).ThenByDescending(m => m.CreatedAt)
+                    f.Medias.OrderByDescending(m => m.IsPrimary)
                         .Select(m => new GuiaNoivas.Api.Dtos.MediaDto(m.Id, m.Url, m.Filename, m.ContentType, m.IsPrimary)),
                     f.Categoria == null ? null : new GuiaNoivas.Api.Dtos.CategoriaDto(f.Categoria.Id, f.Categoria.Nome, f.Categoria.Slug)
                     ))
@@ -405,22 +462,40 @@ public class FornecedoresController : ControllerBase
             orderedQuery = baseQuery.OrderByDescending(f => f.Destaque).ThenByDescending(f => f.Rating);
         }
 
-        var data = await orderedQuery.Skip((page - 1) * pageSize).Take(pageSize)
-            .Select(f => new GuiaNoivas.Api.Dtos.FornecedorListDto(
-                f.Id,
-                f.Nome,
-                f.Slug,
-                f.Descricao,
-                f.Cidade,
-                f.Rating,
-                f.Destaque,
-                f.SeloFornecedor,
-                f.Ativo,
-                f.Categoria == null ? null : new GuiaNoivas.Api.Dtos.CategoriaDto(f.Categoria.Id, f.Categoria.Nome, f.Categoria.Slug),
-                f.Medias.OrderByDescending(m => m.IsPrimary).ThenByDescending(m => m.CreatedAt).Select(m => new GuiaNoivas.Api.Dtos.MediaDto(m.Id, m.Url, m.Filename, m.ContentType, m.IsPrimary)).FirstOrDefault(),
-                f.Medias.OrderByDescending(m => m.IsPrimary).ThenByDescending(m => m.CreatedAt).Select(m => new GuiaNoivas.Api.Dtos.MediaDto(m.Id, m.Url, m.Filename, m.ContentType, m.IsPrimary))
-            ))
-            .ToListAsync();
+        var isSqliteSearch = _db.Database.ProviderName != null && _db.Database.ProviderName.Contains("Sqlite", StringComparison.OrdinalIgnoreCase);
+        var data = isSqliteSearch
+            ? await orderedQuery.Skip((page - 1) * pageSize).Take(pageSize)
+                .Select(f => new GuiaNoivas.Api.Dtos.FornecedorListDto(
+                    f.Id,
+                    f.Nome,
+                    f.Slug,
+                    f.Descricao,
+                    f.Cidade,
+                    f.Rating,
+                    f.Destaque,
+                    f.SeloFornecedor,
+                    f.Ativo,
+                    f.Categoria == null ? null : new GuiaNoivas.Api.Dtos.CategoriaDto(f.Categoria.Id, f.Categoria.Nome, f.Categoria.Slug),
+                    f.Medias.OrderByDescending(m => m.IsPrimary).Select(m => new GuiaNoivas.Api.Dtos.MediaDto(m.Id, m.Url, m.Filename, m.ContentType, m.IsPrimary)).FirstOrDefault(),
+                    f.Medias.OrderByDescending(m => m.IsPrimary).Select(m => new GuiaNoivas.Api.Dtos.MediaDto(m.Id, m.Url, m.Filename, m.ContentType, m.IsPrimary))
+                ))
+                .ToListAsync()
+            : await orderedQuery.Skip((page - 1) * pageSize).Take(pageSize)
+                .Select(f => new GuiaNoivas.Api.Dtos.FornecedorListDto(
+                    f.Id,
+                    f.Nome,
+                    f.Slug,
+                    f.Descricao,
+                    f.Cidade,
+                    f.Rating,
+                    f.Destaque,
+                    f.SeloFornecedor,
+                    f.Ativo,
+                    f.Categoria == null ? null : new GuiaNoivas.Api.Dtos.CategoriaDto(f.Categoria.Id, f.Categoria.Nome, f.Categoria.Slug),
+                    f.Medias.OrderByDescending(m => m.IsPrimary).ThenByDescending(m => m.CreatedAt).Select(m => new GuiaNoivas.Api.Dtos.MediaDto(m.Id, m.Url, m.Filename, m.ContentType, m.IsPrimary)).FirstOrDefault(),
+                    f.Medias.OrderByDescending(m => m.IsPrimary).ThenByDescending(m => m.CreatedAt).Select(m => new GuiaNoivas.Api.Dtos.MediaDto(m.Id, m.Url, m.Filename, m.ContentType, m.IsPrimary))
+                ))
+                .ToListAsync();
 
         return Ok(new { data, meta = new { total, page, pageSize } });
     }
