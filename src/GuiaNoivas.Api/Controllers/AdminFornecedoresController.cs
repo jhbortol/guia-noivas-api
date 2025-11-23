@@ -34,6 +34,12 @@ public class AdminFornecedoresController : ControllerBase
         var exists = await _db.Fornecedores.AnyAsync(f => f.Slug == slug);
         if (exists) return Conflict(new ProblemDetails { Title = "Slug already in use", Detail = "A fornecedor with this slug already exists.", Status = StatusCodes.Status409Conflict });
 
+        if (dto.CategoriaId != null)
+        {
+            var catExists = await _db.Categorias.AnyAsync(c => c.Id == dto.CategoriaId);
+            if (!catExists) return BadRequest(new ProblemDetails { Title = "CategoriaId does not exist", Status = StatusCodes.Status400BadRequest });
+        }
+
         var entity = new Fornecedor
         {
             Id = Guid.NewGuid(),
@@ -47,6 +53,7 @@ public class AdminFornecedoresController : ControllerBase
             Destaque = dto.Destaque,
             SeloFornecedor = dto.SeloFornecedor,
             Rating = dto.Rating,
+            CategoriaId = dto.CategoriaId,
             Visitas = 0,
             CreatedAt = DateTimeOffset.UtcNow
         };
@@ -85,6 +92,13 @@ public class AdminFornecedoresController : ControllerBase
         existing.Destaque = dto.Destaque;
         existing.SeloFornecedor = dto.SeloFornecedor;
         existing.Rating = dto.Rating;
+        // CategoriaId update
+        if (dto.CategoriaId != null)
+        {
+            var catExists = await _db.Categorias.AnyAsync(c => c.Id == dto.CategoriaId);
+            if (!catExists) return BadRequest(new ProblemDetails { Title = "CategoriaId does not exist", Status = StatusCodes.Status400BadRequest });
+        }
+        existing.CategoriaId = dto.CategoriaId;
         existing.UpdatedAt = DateTimeOffset.UtcNow;
 
         _db.Fornecedores.Update(existing);
@@ -164,6 +178,7 @@ public class CreateFornecedorDto
 
     [Range(0, 5)]
     public decimal? Rating { get; set; }
+    public Guid? CategoriaId { get; set; }
 }
 
 public class UpdateFornecedorDto
@@ -195,6 +210,7 @@ public class UpdateFornecedorDto
 
     [Range(0, 5)]
     public decimal? Rating { get; set; }
+    public Guid? CategoriaId { get; set; }
 }
 
 
