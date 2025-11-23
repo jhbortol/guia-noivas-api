@@ -25,8 +25,10 @@ public class MediaController : ControllerBase
     {
         if (dto.File == null || dto.File.Length == 0)
             return BadRequest(new { message = "Arquivo não enviado." });
-        if (dto.FornecedorId == null)
-            return BadRequest(new { message = "FornecedorId é obrigatório." });
+
+        // FornecedorId is optional: allow uploading media not tied to a Fornecedor (e.g., category or generic media).
+        // When provided, controller will persist the association; other operations that require FornecedorId (like marking primary)
+        // still validate its presence.
 
         // Salvar arquivo no storage (exemplo: local ou Azure Blob)
         string publicUrl;

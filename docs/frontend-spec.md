@@ -36,7 +36,7 @@ Conteúdo deste documento
 - Sistema de autenticação: login, refresh de tokens e logout. Operações admin exigem claim `Role=Admin`.
  - Uploads de imagens: o frontend envia o arquivo e os metadados via endpoint dedicado para o backend, que realiza o upload, associa ao fornecedor e retorna a URL pública. O frontend deve reagir a erros de upload e exibir progresso.
 
-Regra importante: Um Fornecedor deve existir antes de associar imagens a ele (criar fornecedor primeiro, depois enviar imagens com `fornecedorId`). O frontend deve validar isso e evitar iniciar upload para recursos inexistentes. O upload é sempre feito pelo backend, nunca direto para storage.
+ Regra importante: Quando associando uma imagem a um `Fornecedor`, este deve existir antes (criar fornecedor primeiro, depois enviar imagens com `fornecedorId`). Contudo, `fornecedorId` no contrato de upload é opcional: o frontend pode omitir o campo para enviar imagens genéricas ou associadas a outras entidades (ex.: categorias). O upload é sempre feito pelo backend, nunca direto para storage.
 
 --------------------------------------------------------------------------------
 
@@ -134,14 +134,14 @@ Exemplo de request (multipart/form-data):
 POST /api/v1/media/upload
 Content-Type: multipart/form-data
 
-Campos:
-- file: arquivo da imagem
-- fornecedorId: GUID
-- filename: string
-- contentType: string
-- isPrimary: bool
-- width: int (opcional)
-- height: int (opcional)
+ Campos:
+ - file: arquivo da imagem
+ - fornecedorId: GUID (opcional) — quando informado, será associado ao fornecedor; omita para media genérica ou de outras entidades
+ - filename: string
+ - contentType: string
+ - isPrimary: bool
+ - width: int (opcional)
+ - height: int (opcional)
 ```
 
 Exemplo de response:
