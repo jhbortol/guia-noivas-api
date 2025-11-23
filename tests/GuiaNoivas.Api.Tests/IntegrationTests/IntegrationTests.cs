@@ -128,6 +128,73 @@ public class IntegrationTests : IClassFixture<WebApplicationFactory<Program>>
         Assert.False(string.IsNullOrWhiteSpace(uploadJson));
     }
 
+    [Fact]
+    public async Task Admin_CreateAndUpdate_PersistsCategoriaId()
+    {
+        var client = _factory.CreateClient();
+
+        // create a category directly in the test database
+        Guid categoriaId;
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var cat = new Categoria { Id = Guid.NewGuid(), Nome = "Cat Test", Slug = "cat-test", CreatedAt = DateTimeOffset.UtcNow };
+            db.Categorias.Add(cat);
+            await db.SaveChangesAsync();
+            categoriaId = cat.Id;
+        }
+
+        // Create fornecedor via admin endpoint including categoriaId
+        var fornecedorBody = JsonSerializer.Serialize(new
+        {
+            nome = "Fornecedor Com Categoria",
+            slug = "fornecedor-com-categoria",
+            descricao = "Teste categoria",
+            cidade = "Cidade",
+            categoriaId = categoriaId,
+            destaque = false,
+            seloFornecedor = false
+        });
+
+        var createResp = await client.PostAsync("/api/v1/admin/fornecedores", new StringContent(fornecedorBody, Encoding.UTF8, "application/json"));
+        createResp.EnsureSuccessStatusCode();
+        var createJson = await createResp.Content.ReadAsStringAsync();
+        using var createDoc = JsonDocument.Parse(createJson);
+        var fornecedorId = createDoc.RootElement.GetProperty("id").GetGuid();
+
+        // Verify persisted CategoriaId in the database
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var f = await db.Fornecedores.FindAsync(fornecedorId);
+            Assert.NotNull(f);
+            Assert.Equal(categoriaId, f.CategoriaId);
+        }
+
+        // Create another category and update fornecedor to point to it
+        Guid categoriaId2;
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var cat2 = new Categoria { Id = Guid.NewGuid(), Nome = "Cat Test 2", Slug = "cat-test-2", CreatedAt = DateTimeOffset.UtcNow };
+            db.Categorias.Add(cat2);
+            await db.SaveChangesAsync();
+            categoriaId2 = cat2.Id;
+        }
+
+        var updateBody = JsonSerializer.Serialize(new { categoriaId = categoriaId2 });
+        var putResp = await client.PutAsync($"/api/v1/admin/fornecedores/{fornecedorId}", new StringContent(updateBody, Encoding.UTF8, "application/json"));
+        Assert.Equal(System.Net.HttpStatusCode.NoContent, putResp.StatusCode);
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var f2 = await db.Fornecedores.FindAsync(fornecedorId);
+            Assert.NotNull(f2);
+            Assert.Equal(categoriaId2, f2.CategoriaId);
+        }
+    }
+
     private class FakeBlobService : IBlobService
     {
         public Task<(Uri Url, string BlobName)> GetUploadSasUriAsync(string blobName, TimeSpan expiry, string? contentType = null)

@@ -289,6 +289,8 @@ Admin Fornecedores (require Admin role)
 - `PATCH /admin/fornecedores/{id}/destaque` — toggles destaque
 - `DELETE /admin/fornecedores/{id}` — remove fornecedor (should cascade delete medias or set null per DB rules)
 
+Nota importante: os endpoints administrativos de criação/edição (`POST /admin/fornecedores` e `PUT /admin/fornecedores/{id}`) aceitam o campo opcional `categoriaId` (GUID). O backend valida a existência da categoria e persiste `CategoriaId` na entidade. O frontend deve enviar `categoriaId` quando o usuário selecionar uma categoria no formulário de criar/editar.
+
 Media
 - `POST /media/upload` — upload de imagem e metadados (Admin). Body: multipart/form-data conforme seção 7.
 - `GET /media?fornecedorId={GUID}` — lista medias para um fornecedor (público ou admin conforme design).
