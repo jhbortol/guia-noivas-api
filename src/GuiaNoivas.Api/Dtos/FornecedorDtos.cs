@@ -7,7 +7,7 @@ public record MediaDto(Guid Id, string? Url, string? Filename, string? ContentTy
 
 public record CategoriaDto(Guid Id, string Nome, string Slug);
 
-public record FornecedorListDto(Guid Id, string Nome, string Slug, string? Descricao, string? Cidade, decimal? Rating, bool Destaque, bool SeloFornecedor, bool Ativo, CategoriaDto? Categoria = null, MediaDto? PrimaryImage = null);
+public record FornecedorListDto(Guid Id, string Nome, string Slug, string? Descricao, string? Cidade, decimal? Rating, bool Destaque, bool SeloFornecedor, bool Ativo, CategoriaDto? Categoria = null, MediaDto? PrimaryImage = null, IEnumerable<MediaDto>? Imagens = null);
 
 public record FornecedorDetailDto(Guid Id, string Nome, string Slug, string? Descricao, string? Cidade, string? Telefone, string? Email, string? Website, bool Destaque, bool SeloFornecedor, bool Ativo, decimal? Rating, int Visitas, DateTimeOffset CreatedAt, DateTimeOffset? UpdatedAt, IEnumerable<MediaDto>? Imagens = null, CategoriaDto? Categoria = null);
 
