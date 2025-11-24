@@ -53,6 +53,23 @@ public class MediaController : ControllerBase
         }
 
         // Persistir metadados
+        var db = HttpContext.RequestServices.GetRequiredService<GuiaNoivas.Api.Data.AppDbContext>();
+
+        // If associating to a Categoria, unset previous association to guarantee one-to-one
+        if (dto.CategoriaId != null)
+        {
+            var existing = await db.Media.Where(m => m.CategoriaId == dto.CategoriaId).ToListAsync();
+            if (existing.Any())
+            {
+                foreach (var e in existing)
+                {
+                    e.CategoriaId = null;
+                    db.Media.Update(e);
+                }
+                await db.SaveChangesAsync();
+            }
+        }
+
         var media = new GuiaNoivas.Api.Models.Media
         {
             Id = Guid.NewGuid(),
@@ -66,7 +83,6 @@ public class MediaController : ControllerBase
             IsPrimary = dto.IsPrimary,
             CreatedAt = DateTimeOffset.UtcNow
         };
-        var db = HttpContext.RequestServices.GetRequiredService<GuiaNoivas.Api.Data.AppDbContext>();
         db.Media.Add(media);
         await db.SaveChangesAsync();
         return CreatedAtAction(nameof(GetById), new { id = media.Id }, media);

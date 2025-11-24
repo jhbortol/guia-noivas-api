@@ -254,11 +254,7 @@ public class IntegrationTests : IClassFixture<WebApplicationFactory<Program>>
         using var uploadDoc2 = JsonDocument.Parse(uploadJson2);
         var mediaId2 = uploadDoc2.RootElement.GetProperty("id").GetGuid();
 
-        // Update category to use the new media (use MediaId in update DTO)
-        var updateBody = JsonSerializer.Serialize(new { nome = "Cat With Media", slug = "cat-with-media", descricao = "Categoria para teste", order = 1, mediaId = mediaId2 });
-        var putResp = await client.PutAsync($"/api/v1/categorias/{categoriaId}", new StringContent(updateBody, Encoding.UTF8, "application/json"));
-        Assert.Equal(System.Net.HttpStatusCode.NoContent, putResp.StatusCode);
-
+        // After uploading with CategoriaId the second upload should replace the category image
         var getCatResp2 = await client.GetAsync($"/api/v1/categorias/{categoriaId}");
         getCatResp2.EnsureSuccessStatusCode();
         var getCatJson2 = await getCatResp2.Content.ReadAsStringAsync();

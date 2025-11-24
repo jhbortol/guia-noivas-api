@@ -13,10 +13,12 @@ namespace GuiaNoivas.Api.Controllers;
 public class CategoriasController : ControllerBase
 {
     private readonly AppDbContext _db;
+    private readonly GuiaNoivas.Api.Services.IBlobService? _blobService;
 
-    public CategoriasController(AppDbContext db)
+    public CategoriasController(AppDbContext db, GuiaNoivas.Api.Services.IBlobService? blobService = null)
     {
         _db = db;
+        _blobService = blobService;
     }
 
     [HttpGet]
@@ -69,17 +71,50 @@ public class CategoriasController : ControllerBase
         _db.Categorias.Add(c);
         await _db.SaveChangesAsync();
 
-        // Se foi fornecido MediaId, vincular essa mídia à categoria recém-criada
-        if (dto is not null && dto.MediaId is not null)
+        // If image content is provided, upload it and create media associated to category
+        if (!string.IsNullOrWhiteSpace(dto.ImageBase64))
         {
-            var media = await _db.Media.FindAsync(dto.MediaId.Value);
-            if (media != null)
+            try
             {
-                media.CategoriaId = c.Id;
-                _db.Media.Update(media);
+                var bytes = Convert.FromBase64String(dto.ImageBase64);
+                using var ms = new System.IO.MemoryStream(bytes);
+                var filename = dto.ImageFilename ?? $"image_{Guid.NewGuid():N}";
+                string publicUrl;
+                var contentType = dto.ImageContentType ?? "application/octet-stream";
+                if (_blobService != null)
+                {
+                    var blobName = $"media/{DateTime.UtcNow:yyyy/MM}/{Guid.NewGuid():N}_{filename}";
+                    publicUrl = await _blobService.UploadAsync(blobName, ms, contentType);
+                }
+                else
+                {
+                    // fallback: save locally
+                    var uploads = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads");
+                    Directory.CreateDirectory(uploads);
+                    var filePath = Path.Combine(uploads, filename);
+                    await System.IO.File.WriteAllBytesAsync(filePath, bytes);
+                    publicUrl = $"/uploads/{filename}";
+                }
+
+                var media = new GuiaNoivas.Api.Models.Media
+                {
+                    Id = Guid.NewGuid(),
+                    CategoriaId = c.Id,
+                    Url = publicUrl,
+                    Filename = dto.ImageFilename ?? filename,
+                    ContentType = contentType,
+                    CreatedAt = DateTimeOffset.UtcNow
+                };
+                _db.Media.Add(media);
                 await _db.SaveChangesAsync();
             }
+            catch (FormatException)
+            {
+                return BadRequest(new { message = "ImageBase64 is not a valid base64 string." });
+            }
         }
+
+        // legacy MediaId removed — prefer uploading with CategoriaId or sending ImageBase64
         return CreatedAtAction(nameof(GetById), new { id = c.Id }, new { c.Id });
     }
 
@@ -104,29 +139,57 @@ public class CategoriasController : ControllerBase
         _db.Categorias.Update(c);
         await _db.SaveChangesAsync();
 
-        // Atualizar associação de mídia: remover associação antiga e linkar nova (se fornecida)
-        if (dto is not null)
+        // Handle image content upload if provided
+        if (!string.IsNullOrWhiteSpace(dto.ImageBase64))
         {
-            // remover mídia antiga vinculada a essa categoria (se diferente da nova)
-            var currentMedia = await _db.Media.FirstOrDefaultAsync(m => m.CategoriaId == id);
-            if (currentMedia != null && currentMedia.Id != dto.MediaId)
+            try
             {
-                currentMedia.CategoriaId = null;
-                _db.Media.Update(currentMedia);
-            }
-
-            if (dto.MediaId is not null)
-            {
-                var newMedia = await _db.Media.FindAsync(dto.MediaId.Value);
-                if (newMedia != null)
+                var bytes = Convert.FromBase64String(dto.ImageBase64);
+                using var ms = new System.IO.MemoryStream(bytes);
+                var filename = dto.ImageFilename ?? $"image_{Guid.NewGuid():N}";
+                string publicUrl;
+                var contentType = dto.ImageContentType ?? "application/octet-stream";
+                if (_blobService != null)
                 {
-                    newMedia.CategoriaId = id;
-                    _db.Media.Update(newMedia);
+                    var blobName = $"media/{DateTime.UtcNow:yyyy/MM}/{Guid.NewGuid():N}_{filename}";
+                    publicUrl = await _blobService.UploadAsync(blobName, ms, contentType);
                 }
-            }
+                else
+                {
+                    var uploads = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads");
+                    Directory.CreateDirectory(uploads);
+                    var filePath = Path.Combine(uploads, filename);
+                    await System.IO.File.WriteAllBytesAsync(filePath, bytes);
+                    publicUrl = $"/uploads/{filename}";
+                }
 
-            await _db.SaveChangesAsync();
+                // unlink previous media
+                var currentMedia = await _db.Media.FirstOrDefaultAsync(m => m.CategoriaId == id);
+                if (currentMedia != null)
+                {
+                    currentMedia.CategoriaId = null;
+                    _db.Media.Update(currentMedia);
+                }
+
+                var media = new GuiaNoivas.Api.Models.Media
+                {
+                    Id = Guid.NewGuid(),
+                    CategoriaId = id,
+                    Url = publicUrl,
+                    Filename = dto.ImageFilename ?? filename,
+                    ContentType = contentType,
+                    CreatedAt = DateTimeOffset.UtcNow
+                };
+                _db.Media.Add(media);
+                await _db.SaveChangesAsync();
+            }
+            catch (FormatException)
+            {
+                return BadRequest(new { message = "ImageBase64 is not a valid base64 string." });
+            }
         }
+
+        // Legacy MediaId linking removed — uploads should use CategoriaId or create/update may send ImageBase64.
 
         return NoContent();
     }

@@ -21,8 +21,13 @@ public class CategoriaCreateDto
 
     public int Order { get; set; }
 
-    // Opcional: associar uma mídia existente à categoria
-    public Guid? MediaId { get; set; }
+    // NOTE: legacy MediaId linking removed — prefer uploading directly (CategoriaId) or sending ImageBase64
+
+    // Opcional: enviar a imagem embutida (base64) para que o backend faça o upload automaticamente
+    // Se fornecido, backend irá criar uma nova Media e associá-la à categoria
+    public string? ImageBase64 { get; set; }
+    public string? ImageFilename { get; set; }
+    public string? ImageContentType { get; set; }
 }
 
 public class CategoriaUpdateDto
@@ -39,6 +44,10 @@ public class CategoriaUpdateDto
 
     public int Order { get; set; }
 
-    // Opcional: associar/atualizar a mídia da categoria
-    public Guid? MediaId { get; set; }
+    // NOTE: legacy MediaId linking removed — prefer uploading directly (CategoriaId) or sending ImageBase64
+
+    // Opcional: enviar a imagem embutida (base64) para que o backend faça o upload automaticamente
+    public string? ImageBase64 { get; set; }
+    public string? ImageFilename { get; set; }
+    public string? ImageContentType { get; set; }
 }
