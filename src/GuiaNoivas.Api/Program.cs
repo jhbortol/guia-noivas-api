@@ -29,14 +29,29 @@ builder.Services.AddDbContext<AppDbContext>(options => options.UseSqlServer(conn
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("FrontendDev", p =>
-        p.WithOrigins(
-            "http://localhost:4200",                    // origem dev local (Angular)
-            "https://guia-noivas-admin.vercel.app",     // admin em produção
-            "http://localhost",                         // Bruno/Postman/Insomnia local
-            "https://localhost"                         // Bruno/Postman/Insomnia local HTTPS
-         )
-         .AllowAnyHeader()                       // ou restringir: .WithHeaders("Content-Type", "Authorization")
-         .AllowAnyMethod()                       // incluir OPTIONS, POST, etc.
+        p.SetIsOriginAllowed(origin => 
+            {
+                // Permite origens específicas
+                if (string.IsNullOrEmpty(origin)) return true; // Bruno/Postman/Insomnia (sem origin header)
+                
+                var allowedOrigins = new[]
+                {
+                    "http://localhost:4200",
+                    "https://guia-noivas-admin.vercel.app"
+                };
+                
+                // Permite localhost em qualquer porta (para dev)
+                if (origin.StartsWith("http://localhost", StringComparison.OrdinalIgnoreCase) ||
+                    origin.StartsWith("https://localhost", StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+                
+                return allowedOrigins.Contains(origin, StringComparer.OrdinalIgnoreCase);
+            })
+         .AllowAnyHeader()
+         .AllowAnyMethod()
+         .AllowCredentials()
          .SetPreflightMaxAge(TimeSpan.FromHours(6)));
 });
 
