@@ -17,16 +17,23 @@ public class FornecedoresController : ControllerBase
     /// </summary>
     [HttpGet("all")]
     [AllowAnonymous]
-    public async Task<IActionResult> GetAll()
+    public async Task<IActionResult> GetAll([FromQuery] bool? destaque = null)
     {
         var isSqlite = _db.Database.ProviderName != null && _db.Database.ProviderName.Contains("Sqlite", StringComparison.OrdinalIgnoreCase);
 
         if (isSqlite)
         {
-            var fornecedores = await _db.Fornecedores
+            IQueryable<Fornecedor> query = _db.Fornecedores
                 .AsNoTracking()
                 .Include(f => f.Categoria)
-                .Include(f => f.Medias)
+                .Include(f => f.Medias);
+
+            if (destaque.HasValue)
+            {
+                query = query.Where(f => f.Destaque == destaque.Value);
+            }
+
+            var fornecedores = await query
                 .OrderByDescending(f => f.Destaque)
                 .Select(f => new GuiaNoivas.Api.Dtos.FornecedorListDto(
                     f.Id,
@@ -46,10 +53,17 @@ public class FornecedoresController : ControllerBase
             return Ok(fornecedores);
         }
 
-        var fornecedoresNonSqlite = await _db.Fornecedores
+        IQueryable<Fornecedor> queryNonSqlite = _db.Fornecedores
             .AsNoTracking()
             .Include(f => f.Categoria)
-            .Include(f => f.Medias)
+            .Include(f => f.Medias);
+
+        if (destaque.HasValue)
+        {
+            queryNonSqlite = queryNonSqlite.Where(f => f.Destaque == destaque.Value);
+        }
+
+        var fornecedoresNonSqlite = await queryNonSqlite
             .OrderByDescending(f => f.Destaque)
             .Select(f => new GuiaNoivas.Api.Dtos.FornecedorListDto(
                 f.Id,
@@ -74,17 +88,24 @@ public class FornecedoresController : ControllerBase
     /// </summary>
     [HttpGet("ativos")]
     [AllowAnonymous]
-    public async Task<IActionResult> GetAtivos()
+    public async Task<IActionResult> GetAtivos([FromQuery] bool? destaque = null)
     {
         var isSqlite = _db.Database.ProviderName != null && _db.Database.ProviderName.Contains("Sqlite", StringComparison.OrdinalIgnoreCase);
 
         if (isSqlite)
         {
-            var fornecedores = await _db.Fornecedores
+            IQueryable<Fornecedor> query = _db.Fornecedores
                 .AsNoTracking()
                 .Include(f => f.Categoria)
                 .Include(f => f.Medias)
-                .Where(f => f.Ativo)
+                .Where(f => f.Ativo);
+
+            if (destaque.HasValue)
+            {
+                query = query.Where(f => f.Destaque == destaque.Value);
+            }
+
+            var fornecedores = await query
                 .OrderByDescending(f => f.Destaque)
                 .Select(f => new GuiaNoivas.Api.Dtos.FornecedorListDto(
                     f.Id,
@@ -104,11 +125,18 @@ public class FornecedoresController : ControllerBase
             return Ok(fornecedores);
         }
 
-        var fornecedoresNonSqlite = await _db.Fornecedores
+        IQueryable<Fornecedor> queryNonSqlite = _db.Fornecedores
             .AsNoTracking()
             .Include(f => f.Categoria)
             .Include(f => f.Medias)
-            .Where(f => f.Ativo)
+            .Where(f => f.Ativo);
+
+        if (destaque.HasValue)
+        {
+            queryNonSqlite = queryNonSqlite.Where(f => f.Destaque == destaque.Value);
+        }
+
+        var fornecedoresNonSqlite = await queryNonSqlite
             .OrderByDescending(f => f.Destaque)
             .Select(f => new GuiaNoivas.Api.Dtos.FornecedorListDto(
                 f.Id,
@@ -230,7 +258,7 @@ public class FornecedoresController : ControllerBase
     /// List fornecedores with optional filter by categoriaId.
     /// </summary>
     [ProducesResponseType(typeof(object), 200)]
-    public async Task<IActionResult> Get([FromQuery] int page = 1, [FromQuery] int pageSize = 12, [FromQuery] Guid? categoriaId = null)
+    public async Task<IActionResult> Get([FromQuery] int page = 1, [FromQuery] int pageSize = 12, [FromQuery] Guid? categoriaId = null, [FromQuery] bool? destaque = null)
     {
         if (page < 1) page = 1;
         if (pageSize < 1) pageSize = 12;
@@ -243,6 +271,11 @@ public class FornecedoresController : ControllerBase
         if (categoriaId != null)
         {
             baseQuery = baseQuery.Where(f => f.CategoriaId == categoriaId);
+        }
+
+        if (destaque.HasValue)
+        {
+            baseQuery = baseQuery.Where(f => f.Destaque == destaque.Value);
         }
 
         // Count should be done on the base (unordered) query to avoid translation issues on some providers
@@ -452,7 +485,7 @@ public class FornecedoresController : ControllerBase
     /// </summary>
     [HttpGet("search")]
     [AllowAnonymous]
-    public async Task<IActionResult> Search([FromQuery] string nome, [FromQuery] int page = 1, [FromQuery] int pageSize = 12)
+    public async Task<IActionResult> Search([FromQuery] string nome, [FromQuery] int page = 1, [FromQuery] int pageSize = 12, [FromQuery] bool? destaque = null)
     {
         if (string.IsNullOrWhiteSpace(nome)) return BadRequest(new { message = "Nome is required" });
 
@@ -461,6 +494,11 @@ public class FornecedoresController : ControllerBase
             .Include(f => f.Categoria)
             .Include(f => f.Medias)
             .Where(f => EF.Functions.Like(f.Nome, $"%{nome}%"));
+
+        if (destaque.HasValue)
+        {
+            baseQuery = baseQuery.Where(f => f.Destaque == destaque.Value);
+        }
 
         var total = await baseQuery.CountAsync();
 
