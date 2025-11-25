@@ -25,6 +25,16 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
     ?? "Server=.\\SQLEXPRESS;Database=GuiaNoivas;Trusted_Connection=True;MultipleActiveResultSets=true;";
 builder.Services.AddDbContext<AppDbContext>(options => options.UseSqlServer(connectionString));
 
+// CORS
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("FrontendDev", p =>
+        p.WithOrigins("http://localhost:4200")  // origem dev
+         .AllowAnyHeader()                       // ou restringir: .WithHeaders("Content-Type", "Authorization")
+         .AllowAnyMethod()                       // incluir OPTIONS, POST, etc.
+         .SetPreflightMaxAge(TimeSpan.FromHours(6)));
+});
+
 // Controllers
 builder.Services.AddControllers().AddNewtonsoftJson();
 
@@ -160,6 +170,10 @@ using (var scope = app.Services.CreateScope())
 
 
 app.UseRouting();
+
+// CORS - antes da autenticação/autorização
+app.UseCors("FrontendDev");
+
 app.UseAuthentication();
 // Serve static files before authorization so Swagger UI files are accessible
 app.UseStaticFiles();
