@@ -16,6 +16,7 @@ public class AppDbContext : DbContext
     public DbSet<RefreshToken> RefreshTokens { get; set; } = null!;
     public DbSet<ContatoSubmission> ContatoSubmissions { get; set; } = null!;
     public DbSet<InstitucionalContent> InstitucionalContents { get; set; } = null!;
+    public DbSet<Testemunho> Testemunhos { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -95,6 +96,17 @@ public class AppDbContext : DbContext
         {
             b.Property(u => u.CreatedAt).HasDefaultValueSql("SYSUTCDATETIME()");
             b.HasIndex(u => u.Email).IsUnique(false);
+        });
+
+        modelBuilder.Entity<Testemunho>(b =>
+        {
+            b.HasIndex(t => t.FornecedorId);
+            b.Property(t => t.CreatedAt).HasDefaultValueSql("SYSUTCDATETIME()");
+            
+            b.HasOne(t => t.Fornecedor)
+             .WithMany(f => f.Testemunhos)
+             .HasForeignKey(t => t.FornecedorId)
+             .OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

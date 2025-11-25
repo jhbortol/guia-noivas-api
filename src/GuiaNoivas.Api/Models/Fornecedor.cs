@@ -33,4 +33,5 @@ public class Fornecedor
     public Categoria? Categoria { get; set; }
 
     public ICollection<Media> Medias { get; set; } = new List<Media>();
+    public ICollection<Testemunho> Testemunhos { get; set; } = new List<Testemunho>();
 }

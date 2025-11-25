@@ -314,6 +314,7 @@ public class FornecedoresController : ControllerBase
                 .AsNoTracking()
                 .Include(f => f.Categoria)
                 .Include(f => f.Medias)
+                .Include(f => f.Testemunhos)
                 .Where(f => f.Id == id)
                 .Select(f => new GuiaNoivas.Api.Dtos.FornecedorDetailDto(
                     f.Id,
@@ -333,7 +334,9 @@ public class FornecedoresController : ControllerBase
                     f.UpdatedAt,
                     f.Medias.OrderByDescending(m => m.IsPrimary)
                         .Select(m => new GuiaNoivas.Api.Dtos.MediaDto(m.Id, m.Url, m.Filename, m.ContentType, m.IsPrimary)),
-                    f.Categoria == null ? null : new GuiaNoivas.Api.Dtos.CategoriaDto(f.Categoria.Id, f.Categoria.Nome, f.Categoria.Slug)
+                    f.Categoria == null ? null : new GuiaNoivas.Api.Dtos.CategoriaDto(f.Categoria.Id, f.Categoria.Nome, f.Categoria.Slug),
+                    f.Testemunhos.OrderByDescending(t => t.CreatedAt)
+                        .Select(t => new GuiaNoivas.Api.Dtos.TestemunhoListDto { Id = t.Id, Nome = t.Nome, Descricao = t.Descricao, CreatedAt = t.CreatedAt })
                     ))
                     .FirstOrDefaultAsync();
         }
@@ -343,6 +346,7 @@ public class FornecedoresController : ControllerBase
                 .AsNoTracking()
                 .Include(f => f.Categoria)
                 .Include(f => f.Medias)
+                .Include(f => f.Testemunhos)
                 .Where(f => f.Id == id)
                 .Select(f => new GuiaNoivas.Api.Dtos.FornecedorDetailDto(
                     f.Id,
@@ -361,7 +365,9 @@ public class FornecedoresController : ControllerBase
                     f.CreatedAt,
                     f.UpdatedAt,
                     f.Medias.OrderByDescending(m => m.IsPrimary).ThenByDescending(m => m.CreatedAt).Select(m => new GuiaNoivas.Api.Dtos.MediaDto(m.Id, m.Url, m.Filename, m.ContentType, m.IsPrimary)),
-                    f.Categoria == null ? null : new GuiaNoivas.Api.Dtos.CategoriaDto(f.Categoria.Id, f.Categoria.Nome, f.Categoria.Slug)
+                    f.Categoria == null ? null : new GuiaNoivas.Api.Dtos.CategoriaDto(f.Categoria.Id, f.Categoria.Nome, f.Categoria.Slug),
+                    f.Testemunhos.OrderByDescending(t => t.CreatedAt)
+                        .Select(t => new GuiaNoivas.Api.Dtos.TestemunhoListDto { Id = t.Id, Nome = t.Nome, Descricao = t.Descricao, CreatedAt = t.CreatedAt })
                 ))
                 .FirstOrDefaultAsync();
         }
@@ -380,6 +386,7 @@ public class FornecedoresController : ControllerBase
                 .AsNoTracking()
                 .Include(f => f.Categoria)
                 .Include(f => f.Medias)
+                .Include(f => f.Testemunhos)
                 .Where(f => f.Slug == slug)
                 .Select(f => new GuiaNoivas.Api.Dtos.FornecedorDetailDto(
                     f.Id,
@@ -398,7 +405,9 @@ public class FornecedoresController : ControllerBase
                     f.CreatedAt,
                     f.UpdatedAt,
                     f.Medias.OrderByDescending(m => m.IsPrimary).Select(m => new GuiaNoivas.Api.Dtos.MediaDto(m.Id, m.Url, m.Filename, m.ContentType, m.IsPrimary)),
-                    f.Categoria == null ? null : new GuiaNoivas.Api.Dtos.CategoriaDto(f.Categoria.Id, f.Categoria.Nome, f.Categoria.Slug)
+                    f.Categoria == null ? null : new GuiaNoivas.Api.Dtos.CategoriaDto(f.Categoria.Id, f.Categoria.Nome, f.Categoria.Slug),
+                    f.Testemunhos.OrderByDescending(t => t.CreatedAt)
+                        .Select(t => new GuiaNoivas.Api.Dtos.TestemunhoListDto { Id = t.Id, Nome = t.Nome, Descricao = t.Descricao, CreatedAt = t.CreatedAt })
                 ))
                 .FirstOrDefaultAsync();
         }
@@ -408,6 +417,7 @@ public class FornecedoresController : ControllerBase
                 .AsNoTracking()
                 .Include(f => f.Categoria)
                 .Include(f => f.Medias)
+                .Include(f => f.Testemunhos)
                 .Where(f => f.Slug == slug)
                 .Select(f => new GuiaNoivas.Api.Dtos.FornecedorDetailDto(
                     f.Id,
@@ -426,7 +436,9 @@ public class FornecedoresController : ControllerBase
                     f.CreatedAt,
                     f.UpdatedAt,
                     f.Medias.OrderByDescending(m => m.IsPrimary).ThenByDescending(m => m.CreatedAt).Select(m => new GuiaNoivas.Api.Dtos.MediaDto(m.Id, m.Url, m.Filename, m.ContentType, m.IsPrimary)),
-                    f.Categoria == null ? null : new GuiaNoivas.Api.Dtos.CategoriaDto(f.Categoria.Id, f.Categoria.Nome, f.Categoria.Slug)
+                    f.Categoria == null ? null : new GuiaNoivas.Api.Dtos.CategoriaDto(f.Categoria.Id, f.Categoria.Nome, f.Categoria.Slug),
+                    f.Testemunhos.OrderByDescending(t => t.CreatedAt)
+                        .Select(t => new GuiaNoivas.Api.Dtos.TestemunhoListDto { Id = t.Id, Nome = t.Nome, Descricao = t.Descricao, CreatedAt = t.CreatedAt })
                 ))
                 .FirstOrDefaultAsync();
         }
