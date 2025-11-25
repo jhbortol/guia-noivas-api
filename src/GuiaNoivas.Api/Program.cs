@@ -29,7 +29,10 @@ builder.Services.AddDbContext<AppDbContext>(options => options.UseSqlServer(conn
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("FrontendDev", p =>
-        p.WithOrigins("http://localhost:4200")  // origem dev
+        p.WithOrigins(
+            "http://localhost:4200",                    // origem dev local
+            "https://guia-noivas-admin.vercel.app"      // admin em produção
+         )
          .AllowAnyHeader()                       // ou restringir: .WithHeaders("Content-Type", "Authorization")
          .AllowAnyMethod()                       // incluir OPTIONS, POST, etc.
          .SetPreflightMaxAge(TimeSpan.FromHours(6)));
