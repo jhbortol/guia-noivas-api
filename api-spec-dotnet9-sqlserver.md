@@ -59,6 +59,17 @@ Modelos de domínio (resumo)
 - InstitucionalContent
   - Key (sobre, termos), Title, ContentHtml, Version, UpdatedAt
 
+- Testemunho
+  - Id: uniqueidentifier (GUID)
+  - FornecedorId: uniqueidentifier NOT NULL (FK → Fornecedores)
+  - Nome: nvarchar(200) NOT NULL
+  - Descricao: nvarchar(2000) NOT NULL
+  - CreatedAt: datetimeoffset
+
+Relacionamentos:
+- Fornecedor 1:N Testemunhos (um fornecedor pode ter vários testemunhos)
+- Testemunho N:1 Fornecedor (cada testemunho pertence a apenas um fornecedor)
+
 Banco de dados: SQL Server 2022 Express
 - Provider EF Core: `Microsoft.EntityFrameworkCore.SqlServer`.
 - Exemplos de connection string:
@@ -160,6 +171,19 @@ Endpoints (detalhado)
 9) Health
 - GET `/api/v1/health/ready`
 - GET `/api/v1/health/live`
+
+10) Testemunhos (público)
+- GET `/api/v1/testemunhos/fornecedor/{fornecedorId}`
+  - Query: `page,pageSize` (default: page=1, pageSize=10)
+  - Response: `{ data: TestemunhoListDto[], meta: { total, page, pageSize, totalPages } }`
+- GET `/api/v1/testemunhos/{id}` — obtém testemunho específico
+- POST `/api/v1/testemunhos`
+  - Body: `{ nome, descricao, fornecedorId }`
+  - 201 Created: `TestemunhoDto`
+
+11) Admin Testemunhos (autenticado, role=Admin)
+- GET `/api/v1/admin/testemunhos?page=1&pageSize=20&fornecedorId={guid}` — lista todos com filtros
+- DELETE `/api/v1/admin/testemunhos/{id}` — remove testemunho
 
 Exemplos de response
 - GET `/api/v1/fornecedores?page=1&pageSize=12&destaque=true`

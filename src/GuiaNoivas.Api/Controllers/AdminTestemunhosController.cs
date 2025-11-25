@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using GuiaNoivas.Api.Data;
+using GuiaNoivas.Api.Dtos;
 
 namespace GuiaNoivas.Api.Controllers;
 
@@ -46,6 +47,52 @@ public class AdminTestemunhosController : ControllerBase
         _logger.LogInformation("Testemunho {TestemunhoId} removido por admin", id);
 
         return NoContent();
+    }
+
+    /// <summary>
+    /// Atualiza um testemunho (Admin apenas)
+    /// </summary>
+    /// <param name="id">ID do testemunho</param>
+    [HttpPut("{id}")]
+    [ProducesResponseType(typeof(TestemunhoDto), 200)]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(404)]
+    public async Task<IActionResult> Update(Guid id, [FromBody] UpdateTestemunhoDto dto)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        var testemunho = await _context.Testemunhos.FindAsync(id);
+        if (testemunho == null)
+        {
+            return NotFound(new ProblemDetails
+            {
+                Title = "Testemunho não encontrado",
+                Detail = $"Testemunho com ID {id} não foi encontrado.",
+                Status = 404
+            });
+        }
+
+        testemunho.Nome = dto.Nome.Trim();
+        testemunho.Descricao = dto.Descricao.Trim();
+
+        _context.Testemunhos.Update(testemunho);
+        await _context.SaveChangesAsync();
+
+        var result = new TestemunhoDto
+        {
+            Id = testemunho.Id,
+            Nome = testemunho.Nome,
+            Descricao = testemunho.Descricao,
+            FornecedorId = testemunho.FornecedorId,
+            CreatedAt = testemunho.CreatedAt
+        };
+
+        _logger.LogInformation("Testemunho {TestemunhoId} atualizado por admin", id);
+
+        return Ok(result);
     }
 
     /// <summary>
