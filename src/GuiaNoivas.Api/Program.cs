@@ -30,8 +30,10 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("FrontendDev", p =>
         p.WithOrigins(
-            "http://localhost:4200",                    // origem dev local
-            "https://guia-noivas-admin.vercel.app"      // admin em produção
+            "http://localhost:4200",                    // origem dev local (Angular)
+            "https://guia-noivas-admin.vercel.app",     // admin em produção
+            "http://localhost",                         // Bruno/Postman/Insomnia local
+            "https://localhost"                         // Bruno/Postman/Insomnia local HTTPS
          )
          .AllowAnyHeader()                       // ou restringir: .WithHeaders("Content-Type", "Authorization")
          .AllowAnyMethod()                       // incluir OPTIONS, POST, etc.
