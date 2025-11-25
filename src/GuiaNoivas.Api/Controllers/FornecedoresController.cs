@@ -155,6 +155,104 @@ public class FornecedoresController : ControllerBase
             .ToListAsync();
         return Ok(fornecedoresNonSqlite);
     }
+
+    /// <summary>
+    /// Lista fornecedores ativos filtrados por categoria (slug ou ID)
+    /// </summary>
+    [HttpGet("ativos/categoria/{categoriaSlugOrId}")]
+    [AllowAnonymous]
+    public async Task<IActionResult> GetAtivosPorCategoria(
+        string categoriaSlugOrId,
+        [FromQuery] bool? destaque = null,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 12)
+    {
+        if (page < 1) page = 1;
+        if (pageSize < 1 || pageSize > 100) pageSize = 12;
+
+        // Tentar parsear como GUID primeiro
+        Guid? categoriaId = Guid.TryParse(categoriaSlugOrId, out var guid) ? guid : null;
+
+        IQueryable<Fornecedor> baseQuery = _db.Fornecedores
+            .AsNoTracking()
+            .Include(f => f.Categoria)
+            .Include(f => f.Medias)
+            .Where(f => f.Ativo);
+
+        // Filtrar por categoria (ID ou Slug)
+        if (categoriaId.HasValue)
+        {
+            baseQuery = baseQuery.Where(f => f.CategoriaId == categoriaId.Value);
+        }
+        else
+        {
+            baseQuery = baseQuery.Where(f => f.Categoria != null && f.Categoria.Slug == categoriaSlugOrId);
+        }
+
+        // Filtrar por destaque se fornecido
+        if (destaque.HasValue)
+        {
+            baseQuery = baseQuery.Where(f => f.Destaque == destaque.Value);
+        }
+
+        var total = await baseQuery.CountAsync();
+
+        // Ordenação
+        IQueryable<Fornecedor> orderedQuery;
+        var isSqlite = _db.Database.ProviderName != null && _db.Database.ProviderName.Contains("Sqlite", StringComparison.OrdinalIgnoreCase);
+        
+        if (isSqlite)
+        {
+            orderedQuery = baseQuery.OrderByDescending(f => f.Destaque);
+        }
+        else
+        {
+            orderedQuery = baseQuery.OrderByDescending(f => f.Destaque).ThenByDescending(f => f.Rating);
+        }
+
+        List<GuiaNoivas.Api.Dtos.FornecedorListDto> data;
+
+        if (isSqlite)
+        {
+            data = await orderedQuery.Skip((page - 1) * pageSize).Take(pageSize)
+                .Select(f => new GuiaNoivas.Api.Dtos.FornecedorListDto(
+                    f.Id,
+                    f.Nome,
+                    f.Slug,
+                    f.Descricao,
+                    f.Cidade,
+                    f.Rating,
+                    f.Destaque,
+                    f.SeloFornecedor,
+                    f.Ativo,
+                    f.Categoria == null ? null : new GuiaNoivas.Api.Dtos.CategoriaDto(f.Categoria.Id, f.Categoria.Nome, f.Categoria.Slug),
+                    f.Medias.OrderByDescending(m => m.IsPrimary).Select(m => new GuiaNoivas.Api.Dtos.MediaDto(m.Id, m.Url, m.Filename, m.ContentType, m.IsPrimary)).FirstOrDefault(),
+                    f.Medias.OrderByDescending(m => m.IsPrimary).Select(m => new GuiaNoivas.Api.Dtos.MediaDto(m.Id, m.Url, m.Filename, m.ContentType, m.IsPrimary))
+                ))
+                .ToListAsync();
+        }
+        else
+        {
+            data = await orderedQuery.Skip((page - 1) * pageSize).Take(pageSize)
+                .Select(f => new GuiaNoivas.Api.Dtos.FornecedorListDto(
+                    f.Id,
+                    f.Nome,
+                    f.Slug,
+                    f.Descricao,
+                    f.Cidade,
+                    f.Rating,
+                    f.Destaque,
+                    f.SeloFornecedor,
+                    f.Ativo,
+                    f.Categoria == null ? null : new GuiaNoivas.Api.Dtos.CategoriaDto(f.Categoria.Id, f.Categoria.Nome, f.Categoria.Slug),
+                    f.Medias.OrderByDescending(m => m.IsPrimary).ThenByDescending(m => m.CreatedAt).Select(m => new GuiaNoivas.Api.Dtos.MediaDto(m.Id, m.Url, m.Filename, m.ContentType, m.IsPrimary)).FirstOrDefault(),
+                    f.Medias.OrderByDescending(m => m.IsPrimary).ThenByDescending(m => m.CreatedAt).Select(m => new GuiaNoivas.Api.Dtos.MediaDto(m.Id, m.Url, m.Filename, m.ContentType, m.IsPrimary))
+                ))
+                .ToListAsync();
+        }
+
+        return Ok(new { data, meta = new { total, page, pageSize, totalPages = (int)Math.Ceiling(total / (double)pageSize) } });
+    }
     
     private readonly AppDbContext _db;
 
