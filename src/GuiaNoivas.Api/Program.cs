@@ -28,10 +28,10 @@ builder.Services.AddDbContext<AppDbContext>(options => options.UseSqlServer(conn
 // CORS
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowAll", p =>
-        p.AllowAnyOrigin()                      // aceita qualquer origem
-         .AllowAnyHeader()                      // aceita qualquer header
-         .AllowAnyMethod()                      // aceita qualquer método (GET, POST, PUT, DELETE, etc.)
+    options.AddPolicy("FrontendDev", p =>
+        p.WithOrigins("http://localhost:4200")  // origem dev
+         .AllowAnyHeader()                       // ou restringir: .WithHeaders("Content-Type", "Authorization")
+         .AllowAnyMethod()                       // incluir OPTIONS, POST, etc.
          .SetPreflightMaxAge(TimeSpan.FromHours(6)));
 });
 
@@ -105,10 +105,24 @@ builder.Services.AddAuthentication(options =>
         };
     });
 
-// Authorization
-// Endpoints com [AllowAnonymous] não requerem autenticação
-// Requisições OPTIONS (CORS preflight) são sempre permitidas
-builder.Services.AddAuthorization();
+// Make all endpoints require authentication by default, except where [AllowAnonymous] is used
+// Only enable the global fallback policy in non-development environments so tools
+// like Swagger UI and the Hangfire dashboard remain accessible while debugging.
+if (!builder.Environment.IsDevelopment())
+{
+    builder.Services.AddAuthorization(options =>
+    {
+        options.FallbackPolicy = new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder()
+            .RequireAuthenticatedUser()
+            .Build();
+    });
+}
+else
+{
+    // In Development register AddAuthorization without a fallback policy so endpoints
+    // without metadata (Swagger, Hangfire) remain accessible.
+    builder.Services.AddAuthorization();
+}
 
 var app = builder.Build();
 
@@ -158,7 +172,7 @@ using (var scope = app.Services.CreateScope())
 app.UseRouting();
 
 // CORS - antes da autenticação/autorização
-app.UseCors("AllowAll");
+app.UseCors("FrontendDev");
 
 app.UseAuthentication();
 // Serve static files before authorization so Swagger UI files are accessible
