@@ -105,24 +105,10 @@ builder.Services.AddAuthentication(options =>
         };
     });
 
-// Make all endpoints require authentication by default, except where [AllowAnonymous] is used
-// Only enable the global fallback policy in non-development environments so tools
-// like Swagger UI and the Hangfire dashboard remain accessible while debugging.
-if (!builder.Environment.IsDevelopment())
-{
-    builder.Services.AddAuthorization(options =>
-    {
-        options.FallbackPolicy = new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder()
-            .RequireAuthenticatedUser()
-            .Build();
-    });
-}
-else
-{
-    // In Development register AddAuthorization without a fallback policy so endpoints
-    // without metadata (Swagger, Hangfire) remain accessible.
-    builder.Services.AddAuthorization();
-}
+// Authorization
+// Endpoints com [AllowAnonymous] não requerem autenticação
+// Requisições OPTIONS (CORS preflight) são sempre permitidas
+builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
