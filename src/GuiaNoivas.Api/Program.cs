@@ -28,10 +28,10 @@ builder.Services.AddDbContext<AppDbContext>(options => options.UseSqlServer(conn
 // CORS
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("FrontendDev", p =>
-        p.WithOrigins("http://localhost:4200")  // origem dev
-         .AllowAnyHeader()                       // ou restringir: .WithHeaders("Content-Type", "Authorization")
-         .AllowAnyMethod()                       // incluir OPTIONS, POST, etc.
+    options.AddPolicy("AllowAll", p =>
+        p.AllowAnyOrigin()                      // aceita qualquer origem
+         .AllowAnyHeader()                      // aceita qualquer header
+         .AllowAnyMethod()                      // aceita qualquer método (GET, POST, PUT, DELETE, etc.)
          .SetPreflightMaxAge(TimeSpan.FromHours(6)));
 });
 
@@ -172,7 +172,7 @@ using (var scope = app.Services.CreateScope())
 app.UseRouting();
 
 // CORS - antes da autenticação/autorização
-app.UseCors("FrontendDev");
+app.UseCors("AllowAll");
 
 app.UseAuthentication();
 // Serve static files before authorization so Swagger UI files are accessible
