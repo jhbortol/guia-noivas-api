@@ -29,29 +29,13 @@ builder.Services.AddDbContext<AppDbContext>(options => options.UseSqlServer(conn
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("FrontendDev", p =>
-        p.SetIsOriginAllowed(origin => 
-            {
-                // Permite origens específicas
-                if (string.IsNullOrEmpty(origin)) return true; // Bruno/Postman/Insomnia (sem origin header)
-                
-                var allowedOrigins = new[]
-                {
-                    "http://localhost:4200",
-                    "https://guia-noivas-admin.vercel.app"
-                };
-                
-                // Permite localhost em qualquer porta (para dev)
-                if (origin.StartsWith("http://localhost", StringComparison.OrdinalIgnoreCase) ||
-                    origin.StartsWith("https://localhost", StringComparison.OrdinalIgnoreCase))
-                {
-                    return true;
-                }
-                
-                return allowedOrigins.Contains(origin, StringComparer.OrdinalIgnoreCase);
-            })
+        p.WithOrigins(
+            "http://localhost:4200",
+            "https://guia-noivas-admin.vercel.app",
+            "https://guia-noivas-dev-piracicaba.netlify.app")
+         .AllowCredentials()                    // permite cookies/credenciais
          .AllowAnyHeader()
          .AllowAnyMethod()
-         .AllowCredentials()
          .SetPreflightMaxAge(TimeSpan.FromHours(6)));
 });
 
