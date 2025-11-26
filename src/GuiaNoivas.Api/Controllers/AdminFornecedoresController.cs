@@ -4,6 +4,7 @@ using GuiaNoivas.Api.Data;
 using Microsoft.EntityFrameworkCore;
 using System.ComponentModel.DataAnnotations;
 using GuiaNoivas.Api.Models;
+using GuiaNoivas.Api.Validation;
 
 namespace GuiaNoivas.Api.Controllers;
 
@@ -173,10 +174,10 @@ public class CreateFornecedorDto
     [MaxLength(50)]
     public string? Telefone { get; set; }
 
-    [EmailAddress, MaxLength(200)]
+    [AllowEmptyEmailAddress, MaxLength(200)]
     public string? Email { get; set; }
 
-    [Url, MaxLength(250)]
+    [AllowEmptyUrl, MaxLength(250)]
     public string? Website { get; set; }
 
     [MaxLength(250)]
@@ -209,10 +210,10 @@ public class UpdateFornecedorDto
     [MaxLength(50)]
     public string? Telefone { get; set; }
 
-    [EmailAddress, MaxLength(200)]
+    [AllowEmptyEmailAddress, MaxLength(200)]
     public string? Email { get; set; }
 
-    [Url, MaxLength(250)]
+    [AllowEmptyUrl, MaxLength(250)]
     public string? Website { get; set; }
 
     [MaxLength(250)]
