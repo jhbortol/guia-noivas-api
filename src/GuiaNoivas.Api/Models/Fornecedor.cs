@@ -20,6 +20,7 @@ public class Fornecedor
     public string? Telefone { get; set; }
     public string? Email { get; set; }
     public string? Website { get; set; }
+    public string? Instagram { get; set; }
     public bool Destaque { get; set; }
     public bool SeloFornecedor { get; set; }
     public decimal? Rating { get; set; }

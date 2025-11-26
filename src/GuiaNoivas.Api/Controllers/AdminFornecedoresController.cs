@@ -50,6 +50,7 @@ public class AdminFornecedoresController : ControllerBase
             Telefone = dto.Telefone,
             Email = dto.Email,
             Website = dto.Website,
+            Instagram = dto.Instagram,
             Destaque = dto.Destaque,
             SeloFornecedor = dto.SeloFornecedor,
             Rating = dto.Rating,
@@ -89,6 +90,7 @@ public class AdminFornecedoresController : ControllerBase
         existing.Telefone = dto.Telefone;
         existing.Email = dto.Email;
         existing.Website = dto.Website;
+        existing.Instagram = dto.Instagram;
         existing.Destaque = dto.Destaque;
         existing.SeloFornecedor = dto.SeloFornecedor;
         existing.Rating = dto.Rating;
@@ -172,6 +174,9 @@ public class CreateFornecedorDto
     [Url, MaxLength(250)]
     public string? Website { get; set; }
 
+    [MaxLength(250)]
+    public string? Instagram { get; set; }
+
     public bool Destaque { get; set; }
 
     public bool SeloFornecedor { get; set; }
@@ -203,6 +208,9 @@ public class UpdateFornecedorDto
 
     [Url, MaxLength(250)]
     public string? Website { get; set; }
+
+    [MaxLength(250)]
+    public string? Instagram { get; set; }
 
     public bool Destaque { get; set; }
 
