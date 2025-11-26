@@ -587,7 +587,7 @@ public class FornecedoresController : ControllerBase
     /// </summary>
     [HttpGet("search")]
     [AllowAnonymous]
-    public async Task<IActionResult> Search([FromQuery] string nome, [FromQuery] int page = 1, [FromQuery] int pageSize = 12, [FromQuery] bool? destaque = null)
+    public async Task<IActionResult> Search([FromQuery] string nome, [FromQuery] int page = 1, [FromQuery] int pageSize = 12, [FromQuery] bool? destaque = null, [FromQuery] bool? ativo = null)
     {
         if (string.IsNullOrWhiteSpace(nome)) return BadRequest(new { message = "Nome is required" });
 
@@ -600,6 +600,11 @@ public class FornecedoresController : ControllerBase
         if (destaque.HasValue)
         {
             baseQuery = baseQuery.Where(f => f.Destaque == destaque.Value);
+        }
+
+        if (ativo.HasValue)
+        {
+            baseQuery = baseQuery.Where(f => f.Ativo == ativo.Value);
         }
 
         var total = await baseQuery.CountAsync();
